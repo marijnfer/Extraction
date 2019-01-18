@@ -1,0 +1,74 @@
+def determineBoundingBox(image,cornerpoints):
+    sizeY = image.shape[0]
+    sizeX = image.shape[1]
+    amountCorners = len(cornerpoints)
+
+    # distance to the specific cornerpoint is added in 
+    # order to sort them in a later stage
+    corner1 = [] # above left
+    corner2 = [] # bottom left   
+    corner3 = [] # bottom right
+    corner4 = [] # above right  
+
+    '''
+    for point in cornerpoints:
+        x = point.x
+        y = point.y
+        if x < sizeX/2:
+            if y < sizeY/2:
+                distance = (x**2+y**2)**0.5           
+                corner1.append((Point(x,y),distance))
+            else:
+                distance = (x**2+(y-sizeY)**2)**0.5 
+                corner2.append((Point(x,y),distance))
+        else:
+            if y > sizeY/2:
+                distance = ((x-sizeX)**2+y**2)**0.5 
+                corner3.append((Point(x,y),distance))
+            else:
+                distance = ((x-sizeX)**2+(y-sizeY)**2)**0.5 
+                corner4.append((Point(x,y),distance))
+    
+    
+    dtype = [('x',int),('y',int),('distance',float)]
+    corner1 = np.asarray(corner1,dtype)
+    corner2 = np.asarray(corner2,dtype)
+    corner3 = np.asarray(corner3,dtype)
+    corner4 = np.asarray(corner4,dtype)
+
+    corner1 = np.sort(corner1, order = 'distance')
+    corner2 = np.sort(corner2, order = 'distance')
+    corner3 = np.sort(corner3, order = 'distance')
+    corner4 = np.sort(corner4, order = 'distance')
+    
+    # The points are sorted because the corner closest to the actual corner
+    # are most likely the corner that define the border.
+    # This will reduce search time drastically if there are many points found.
+    # Het sorteren (per hoekpunt en afstand tot dat hoekpunt) is niet nodig met de volgende methode
+    '''
+    #Methode 1 (niks gevonden => allowedOffset verhogen)
+    possibleCanidates = findPossibleCanidatesBorder(corner1,corner2,corner4,0)
+    candidates = []
+
+    for rectangle in possibleCanidates:
+        if pointOccursInList(rectangle.p2, corner3, 1):
+            #image = rectangle.draw(image)
+            #showImage(image,'',0.3)
+            candidates.append(rectangle)
+
+def findPossibleCanidatesBorder(corner1, corner2, corner4,allowedOffset):
+    possibleCandidates = []
+
+
+    for (point1,_) in corner1:
+        x1,y1 = point1.pointUnpack()
+        for (point2,_) in corner2:
+            x2,y2 = point2.pointUnpack()
+            if inInterval(x2,x1,allowedOffset):
+                for (point4,_) in corner4:
+                    x4,y4 = point4.pointUnpack()
+                    if inInterval(y4,y1,allowedOffset):
+                        possibleCandidates.append(Rectangle(x1,y1,x4,y2))
+            
+    return possibleCandidates
+

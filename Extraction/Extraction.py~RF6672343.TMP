@@ -1,0 +1,239 @@
+'''
+Sources:
+General: https://medium.com/coinmonks/a-box-detection-algorithm-for-any-image-containing-boxes-756c15d7ed26
+https://stackoverflow.com/questions/45088134/extracting-table-structures-from-image
+blobDetection: https://www.learnopencv.com/blob-detection-using-opencv-python-c/
+'''
+
+import cv2
+import numpy as np
+import os
+import glob 
+import math
+from Rectangle import *
+from Point import *
+    
+saveImages = True
+savePath = 'C:\\Users\\marij\\Documents\\Thesis\\Extraction\\Extraction\\save\\'
+
+def showImage(image,title,scale):
+    cv2.imshow(title,cv2.resize(image,(0,0),fx=scale,fy=scale))
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def keypointsToList(keypoints):
+    list = []
+    for kp in keypoints:
+        x = int(kp.pt[0])
+        y = int(kp.pt[1])
+        list.append(Point(x,y))
+    return list
+
+def prepare(path):
+    img = cv2.imread(path, 0)  # Read the image
+    (thresh, img_bin) = cv2.threshold(img, 128, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)  # Thresholding the image
+
+    img_bin = 255-img_bin  # Invert the image
+    
+    if saveImages:
+        loc = savePath + 'initial.png'
+        cv2.imwrite(loc,img_bin)
+
+    return img_bin
+
+def crosspointDetection(image):
+      #showImage(img_bin)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+    
+    i = 40
+
+    # Defining a kernel length
+    kernel_lengthX = np.array(image).shape[1]//i
+    kernel_lengthY = np.array(image).shape[0]//i
+     
+    # A verticle kernel of (1 X kernel_length), which will detect all the verticle lines from the image.
+    verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_lengthX))
+    # A horizontal kernel of (kernel_length X 1), which will help to detect all the horizontal line from the image.
+    hori_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_lengthX, 1))
+    # A kernel of (3 X 3) ones.
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+
+    # Morphological operation to detect verticle lines from an image
+    img_temp1 = cv2.erode(image, verticle_kernel, iterations=1)
+    img_verticle_lines = cv2.dilate(img_temp1, verticle_kernel, iterations=3)
+
+    # Morphological operation to detect horizontal lines from an image
+    img_temp2 = cv2.erode(image, hori_kernel, iterations=1)
+    img_horizontal_lines= cv2.dilate(img_temp2, hori_kernel, iterations=3)
+
+    #combined = np.concatenate((verticle_lines_img,horizontal_lines_img),axis = 1)
+
+    alpha = 0.5
+    beta = 1.0 - alpha
+    #Horizontale en verticale lijnen samenvoegen
+    img_final_bin = cv2.addWeighted(img_verticle_lines, alpha, img_horizontal_lines, beta, 0.0)
+    
+
+    #Thresholden om snijpunten over te houden (hoogste I)
+    (thresh, img_cross) = cv2.threshold(img_final_bin, 200, 255, cv2.THRESH_BINARY)
+    #showImage(img_cross,'cross',0.3)
+    if saveImages:
+        loc = savePath + 'crossings.png'
+        cv2.imwrite(loc,img_cross)
+
+        loc = savePath + 'vertical lines.png'
+        cv2.imwrite(loc,img_verticle_lines)
+
+        loc = savePath + 'horizontal lines.png'
+        cv2.imwrite(loc,img_horizontal_lines)
+
+        loc = savePath + 'vertical and horizontal lines.png'
+        cv2.imwrite(loc,img_final_bin)
+
+    return img_cross
+
+def blobDetection(image): 
+    #Snijpunten zijn blobs van witte pixels
+    params = cv2.SimpleBlobDetector_Params()
+ 
+    # Change thresholds
+    #params.minThreshold = 10;
+    #params.maxThreshold = 200;
+ 
+    # Filter by Area.
+    params.filterByArea = False
+    params.minArea = 1
+ 
+    # Filter by Circularity
+    params.filterByCircularity = False
+    params.minCircularity = 0.0000001
+ 
+    # Filter by Convexity
+    params.filterByConvexity = False
+    params.minConvexity = 0.0000001
+ 
+    # Filter by Inertia
+    params.filterByInertia = False
+    params.minInertiaRatio = 0.0000001
+
+    detector = cv2.SimpleBlobDetector_create(params)
+ 
+    keypoints = detector.detect(cv2.bitwise_not(image))
+
+    keypoints = keypointsToList(keypoints)
+    img_keypoints = np.copy(image)
+    
+    if saveImages:
+        for point in keypoints:
+            cv2.circle(img_keypoints, (point.x,point.y), 25, (255,0,0), 3)
+
+        loc = savePath + 'keypoints.png'
+        cv2.imwrite(loc,img_keypoints)
+
+        #showImage(img_keypoints,"keypoints",0.3)
+    
+    return keypoints
+
+def getCornerPoints(image,keypoints):
+    sizeY = image.shape[0]
+    sizeX = image.shape[1]
+
+    # maximale afstand kader => opzoeken in bin normen
+    # beter vaste grootste werken (dus vaste image size)?
+    # verschillende cornersize voor x en y ?
+    cornerSize = 0.05
+    
+    windowX = int(cornerSize*sizeX)
+    windowY = int(cornerSize*sizeY)
+
+    corners = []
+
+    for point in keypoints:
+        x = point.x
+        y = point.y
+        if (0 <= y and y <= windowY) or (sizeY - windowY <= y):
+            if (0 <= x and x <= windowX) or (x >= sizeX - windowX ):
+                corners.append(Point(x,y))
+
+    if saveImages:
+        for point in corners:
+            cv2.circle(image, (point.x,point.y), 25, (255,0,0), 3)
+    
+        #showImage(image,"cornerpoints",0.3)
+        loc = savePath + 'corners.png'
+        cv2.imwrite(loc,image)
+
+    return corners
+
+def determineBoundingBox(image,cornerpoints):
+    sizeY = image.shape[0]
+    sizeX = image.shape[1]
+    
+    # methode2 tijdscomlexiteits is slecht maar detecteerd wel alle mogelijke rechthoeken
+    possibleBorders = []
+    start = 0
+
+    for i in range(0,len(cornerpoints)):
+        point = cornerpoints[i]
+        x,y = point.pointUnpack()
+        eqX = equalX(x,cornerpoints[i+1:len(cornerpoints)],1)
+        eqY = equalY(y,cornerpoints[i+1:len(cornerpoints)],1)
+       
+        for p1 in eqX:
+            for p2 in eqY:
+                extractedPoint = Point(p2.x,p1.y)
+                if pointOccursInList(extractedPoint,cornerpoints,1):
+                    possibleBorders.append(Rectangle(x,y,p2.x,p1.y))
+
+    if saveImages:
+        i = 0
+        for r in possibleBorders:
+            print(r.p1,r.p2)
+
+            
+            img = np.copy(image)
+            img = r.draw(img)
+            #showImage(img,"",0.3)
+
+            loc = savePath + 'bordersCross\\{}.png'.format(i)
+            cv2.imwrite(loc,img)
+            
+            loc = savePath + 'bordersOriginal\\{}.png'.format(i)
+            img = np.copy(cv2.imread('C:\\Users\\marij\\Documents\\Thesis\\Drawings\\2.png'))
+            img = r.draw(img)
+            cv2.imwrite(loc,img)
+            i+=1
+                    
+
+    print('')
+
+def inInterval(value, ref, interval):
+    if value >= ref-interval and value <= ref + interval:
+        return True
+    else: 
+        return False
+
+
+def application(path):
+    img_initial = prepare(path)
+    img_crosspoints = crosspointDetection(img_initial)
+    keypoints = blobDetection(img_crosspoints)
+    
+    cornerpoints = getCornerPoints(img_crosspoints,keypoints)
+    
+    determineBoundingBox(img_crosspoints,cornerpoints)
+
+    print("done")
+    #showImage(img_crosspoints,"",0.3)
+    
+
+
+
+
+
+
+
+
+    
+application('C:\\Users\\marij\\Documents\\Thesis\\Drawings\\2.png')
+

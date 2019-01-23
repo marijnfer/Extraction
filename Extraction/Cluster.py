@@ -21,7 +21,7 @@ def prepareBorder(pob):
     rangeX = maxX-minX
     rangeY = maxY-minY
 
-    if rangeX > rangeY:
+    if rangeX > rangeY: #eig niet nodig want wordt enkel maar gebruikt voor pob1 en pob3
         pob[:,0] = range * (pob[:,0]-minX)/rangeX
         #herschaal van 0 tot 1 zodat neigborhood functie in DBSCAN voornamelijk 
         #afhangt van de dominate richting
@@ -32,9 +32,6 @@ def prepareBorder(pob):
 
 
     return pob
-
-
-
 
 def clusterBorders(pob):
     pob1 = prepareBorder(pob)
@@ -54,7 +51,7 @@ def clusterBorders(pob):
         if iStart == -1 and labels[i] == 0:
             iStart = i
         if iStart > -1 and labels[i] == -1:
-            iStop = i-1
+            iStop = i
             break
 
     a = pob[iStart:iStop,:]

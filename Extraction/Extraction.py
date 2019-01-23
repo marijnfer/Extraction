@@ -16,10 +16,11 @@ from Point import *
 import shutil
 import Cluster
 import time
+import TableConstruct
 
 saveImages = True
 savePath = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Extraction\\Extraction\\save\\'
-mainPath =  'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Drawings\\2.png'
+mainPath = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Drawings\\2.png'
 
 def showImage(image,title,scale):
 	cv2.imshow(title,cv2.resize(image,(0,0),fx=scale,fy=scale))
@@ -38,7 +39,7 @@ def prepare(path):
 	img = cv2.imread(path, 0)  # Read the image
 	(thresh, img_bin) = cv2.threshold(img, 128, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)  # Thresholding the image
 
-	img_bin = 255-img_bin  # Invert the image
+	img_bin = 255 - img_bin  # Invert the image
 	
 	if saveImages:
 		loc = savePath + '1 initial.png'
@@ -54,14 +55,16 @@ def crosspointDetection(image):
 	kleineKernel = 3
 
 	# Defining a kernel length
-	kernel_lengthX = np.array(image).shape[1]//i
-	kernel_lengthY = np.array(image).shape[0]//i
-	 
-	# A verticle kernel of (1 X kernel_length), which will detect all the verticle lines from the image.
-	verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_lengthX))
+	kernel_lengthX = np.array(image).shape[1] // i
+	kernel_lengthY = np.array(image).shape[0] // i
+
+	# A verticle kernel of (1 X kernel_length), which will detect all the verticle
+	# lines from the image.
+	verticle_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,kernel_lengthY))
 	verticle_kernel1 = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kleineKernel))
 
-	# A horizontal kernel of (kernel_length X 1), which will help to detect all the horizontal line from the image.
+	# A horizontal kernel of (kernel_length X 1), which will help to detect all
+	# the horizontal line from the image.
 	hori_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_lengthX, 1))
 	hori_kernel1 = cv2.getStructuringElement(cv2.MORPH_RECT, (kleineKernel, 1))
 
@@ -70,13 +73,16 @@ def crosspointDetection(image):
 
 	# Morphological operation to detect verticle lines from an image
 	img_temp1 = cv2.erode(image, verticle_kernel, iterations=1)
-	img_temp1 = cv2.dilate(img_temp1, verticle_kernel, iterations=1)
-	img_verticle_lines = cv2.dilate(img_temp1, verticle_kernel1, iterations=3)
+	showImage(img_temp1,"",0.3)#[1838:2338,2508:3308]
 
+	img_temp1 = cv2.dilate(img_temp1, verticle_kernel, iterations=1)
+	showImage(img_temp1,"",0.3)
+	img_verticle_lines = cv2.dilate(img_temp1, verticle_kernel1, iterations=3)
+	showImage(img_temp1,"",0.3)
 	# Morphological operation to detect horizontal lines from an image
 	img_temp2 = cv2.erode(image, hori_kernel, iterations=1)
-	img_temp2= cv2.dilate(img_temp2, hori_kernel, iterations=1)
-	img_horizontal_lines= cv2.dilate(img_temp2, hori_kernel1, iterations=3)
+	img_temp2 = cv2.dilate(img_temp2, hori_kernel, iterations=1)
+	img_horizontal_lines = cv2.dilate(img_temp2, hori_kernel1, iterations=3)
 
 	#combined = np.concatenate((verticle_lines_img,horizontal_lines_img),axis = 1)
 
@@ -155,8 +161,8 @@ def getCornerPoints(image,keypoints):
 	# verschillende cornersize voor x en y ?
 	cornerSize = 0.1
 	
-	windowX = int(cornerSize*sizeX)
-	windowY = int(cornerSize*sizeY)
+	windowX = int(cornerSize * sizeX)
+	windowY = int(cornerSize * sizeY)
 
 	corners = []
 	image = np.copy(image)
@@ -164,7 +170,7 @@ def getCornerPoints(image,keypoints):
 		x = point.x
 		y = point.y
 		if (0 <= y and y <= windowY) or (sizeY - windowY <= y):
-			if (0 <= x and x <= windowX) or (x >= sizeX - windowX ):
+			if (0 <= x and x <= windowX) or (x >= sizeX - windowX):
 				corners.append(Point(x,y))
 
 	if saveImages:
@@ -181,15 +187,16 @@ def determineBoundingBox(image,cornerpoints):
 	sizeY = image.shape[0]
 	sizeX = image.shape[1]
 	
-	# methode2 tijdscomlexiteits is slecht maar detecteerd wel alle mogelijke rechthoeken
+	# methode2 tijdscomlexiteits is slecht maar detecteerd wel alle mogelijke
+	# rechthoeken
 	possibleBorders = []
 	start = 0
 
 	for i in range(0,len(cornerpoints)):
 		point = cornerpoints[i]
 		x,y = point.pointUnpack()
-		eqX = equalX(x,cornerpoints[i+1:len(cornerpoints)],1)
-		eqY = equalY(y,cornerpoints[i+1:len(cornerpoints)],1)
+		eqX = equalX(x,cornerpoints[i + 1:len(cornerpoints)],1)
+		eqY = equalY(y,cornerpoints[i + 1:len(cornerpoints)],1)
 	   
 		for p1 in eqX:
 			for p2 in eqY:
@@ -227,12 +234,12 @@ def determineBoundingBox(image,cornerpoints):
 			i+=1
 	  
 	#Alle kleine rechthoeken weg => kunnen nooit een rand zijn
-	minArea = 0.7*image.shape[0]*image.shape[1]
+	minArea = 0.7 * image.shape[0] * image.shape[1]
 	possibleBorders = [rect for rect in possibleBorders if rect.area > minArea]
 
 	border = None
 	if len(possibleBorders) == 1:
-		border =  possibleBorders[0]
+		border = possibleBorders[0]
 	elif len(possibleBorders) == 2:
 	   r1 = possibleBorders[0]
 	   r2 = possibleBorders[1]
@@ -260,7 +267,7 @@ def determineBoundingBox(image,cornerpoints):
 	return border
 
 def inInterval(value, ref, interval):
-	if value >= ref-interval and value <= ref + interval:
+	if value >= ref - interval and value <= ref + interval:
 		return True
 	else: 
 		return False
@@ -358,31 +365,30 @@ def application(path):
 				os.unlink(os.path.join(root, f))
 		
 	img_initial = prepare(path)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
 	img_crosspoints = crosspointDetection(img_initial)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
 	keypoints = blobDetection(img_crosspoints)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
 	cornerpoints = getCornerPoints(img_crosspoints,keypoints)
-	print "%.2gs" % (time.clock()-start)
-	border =  determineBoundingBox(img_crosspoints,cornerpoints)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
+	border = determineBoundingBox(img_crosspoints,cornerpoints)
+	print "%.2gs" % (time.clock() - start)
 	pob1,pob2,pob3,pob4 = keypointsOnBorder(keypoints, border,2,img_crosspoints)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
 	keypoints = deleteBorderFromKeypoints(border,keypoints,pob1,pob2,pob3,pob4,img_crosspoints)
-	print "%.2gs" % (time.clock()-start)
+	print "%.2gs" % (time.clock() - start)
 
 	pob1 = pointToArrayList(pob1)
 	pob2 = pointToArrayList(pob2)
 	pob3 = pointToArrayList(pob3)
 	pob4 = pointToArrayList(pob4)
 
+	TableConstruct.constructTable(pob1,pob2,pob3,pob4,keypoints,border,img_initial)
+	
 
-	a = Cluster.clusterBorders(pob1)
-
-	a = Cluster.determineTables(pob1,pob2,keypoints,saveImages,img_crosspoints,path,img_initial)
-	print "%.2gs" % (time.clock()-start)
-	#border1 =  determineBoundingBox1(img_crosspoints,keypoints)
+	print "%.2gs" % (time.clock() - start)
+	#border1 = determineBoundingBox1(img_crosspoints,keypoints)
 
 
 	print("done")

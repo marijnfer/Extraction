@@ -47,7 +47,8 @@ def equalY(y,pointList,allowedDeviation):
             temp.append(point)
     return temp
 
-
+def arrayToPoint(array):
+    return Point(array[0],array[1])
 
 # Eventueel mogelijk afwijkingen in rekening brengen 
 # Daarom geen x == x1 en y == y1
@@ -60,7 +61,7 @@ def pointOccursInList(p,list, allowedDeviation):
 
 
 def drawLine(point1,point2,image):
-    image = cv2.line(image,(point1.x,point1.y),(point2.x,point2.y),(255,0,0),5)
+    image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,0,0),5)
     return image
 
 def minMaxXY(numpyAr):
@@ -113,7 +114,22 @@ def pointToArrayList(list):
     return temp
 
 
+def boundaries(p1,p2):
+    if p1.x >= p2.x:
+        maxx = p1.x
+        minx = p2.x
+    else:
+        maxx = p2.x
+        minx = p1.x
 
+    if p1.y >= p2.y:
+        maxy = p1.y
+        miny = p2.y
+    else:
+        maxy = p2.y
+        miny = p1.y
+
+    return minx,maxx, miny, maxy
 
 def averagePoint(list):
     x = 0
@@ -122,3 +138,8 @@ def averagePoint(list):
         x += p.x
         y += p.y
     return Point(x/len(list),y/len(list))
+
+def distancePointToLine(p1,p2,x,y):
+    d1 = (p2.x-p1.x)*(y - p1.y) - (x-p1.x)*(p2.y - p1.y)
+    d1 = abs(d1)/ ((p2.x-p1.x)**2+(p2.y-p1.y)**2)
+    return d1

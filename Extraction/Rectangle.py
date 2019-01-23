@@ -9,6 +9,20 @@ class Rectangle:
 	# 4 punten genomen ipv 2 omdat de rechthoeken een beetje kunnen afwijken
 	# Bij init: punten formatten zodat p1 altijd het punt links boven,...
 	def __init__(self, p1,p2,p3,p4):
+		if not isinstance(p1,Point):
+			p1 = arrayToPoint(p1)
+
+		if not isinstance(p2,Point):
+			p2 = arrayToPoint(p2)
+
+		if not isinstance(p3,Point):
+			p3 = arrayToPoint(p3)
+
+		if not isinstance(p4,Point):
+			p4 = arrayToPoint(p4)
+
+
+
 		points = [p1,p2,p3,p4]
 		dis = np.zeros(4)
 
@@ -27,25 +41,37 @@ class Rectangle:
 		points.remove(self.p4)
 
 		self.p3 = points[0]
+
 		
-		'''
-		# ensure that all points are in the correct order
-		if x1 < x2:
-			if y1 < y2:
-				self.p1 = Point(x1,y1)
-				self.p2 = Point(x2,y2)
-			else:
-				self.p1 = Point(x1,y2)
-				self.p2 = Point(x2,y1)
+
+	def containsPoint(self,point):
+		if isinstance(point,Point):
+			x = point.x
+			y = point.y
 		else:
-			if y1 < y2:
-				self.p1 = Point(x2,y1)
-				self.p2 = Point(x1,y2)
-			else:
-				self.p1 = Point(x2,y2)
-				self.p2 = Point(x1,y1)
+			x = point[0]
+			y = point[1]
+
+		#Quick check if points lies between border
+		if self.p1.x <= x and x <= self.p4.x:
+			if self.p1.y <= y and self.p2.y:
+				return True
+		return False
 		'''
-   
+		#Points near 
+		if distancePointToLine(self.p1,self.p2,x,y) <= 2:
+			return True
+		if distancePointToLine(self.p2,self.p3,x,y) <= 2:
+			return True
+		if distancePointToLine(self.p3,self.p4,x,y) <= 2:
+			return True
+		if distancePointToLine(self.p4,self.p1,x,y) <= 2:
+			return True
+		return False
+		'''
+
+
+		
 	def onBorder(self,point):
 		if distance(self.p1,point) == 0:
 			return True
@@ -106,3 +132,4 @@ class Rectangle:
 	def area(self):
 		return (self.p3.x - self.p2.x) * (self.p2.y - self.p1.y)
 
+	

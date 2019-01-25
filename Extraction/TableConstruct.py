@@ -3,6 +3,7 @@ import Cluster
 import cv2
 import Rectangle
 from TablePoint import *
+import random
 
 class TableConstruct:
 	global tollerance
@@ -54,25 +55,16 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image):
 		temp = removeUnrelevantPoints(temp,tables[i])
 		tablePoints.append(temp)
 
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+
+
 	for tp in tablePoints[0]:
-		tp.draw(image1)
-	
-	showImage(image1,'',0.3)
+		#tp.draw(image2)
+		print tp.point
+	#showImage(image2,'',0.3)
 
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for tp in tablePoints[1]:
-		tp.draw(image1)
-	
-	showImage(image1,'',0.3)
 
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for tp in tablePoints[2]:
-		tp.draw(image1)
-	
-	showImage(image1,'',0.3)
-	
-	
+
+	constructTables(tablePoints[0],image1)
 
 
 	'''
@@ -98,66 +90,190 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image):
 	showImage(image2,'',0.3)
 	'''
 
-	
-	
-	
-
-	for tp in test:
-		tp.draw(image2)
-	
-	showImage(image2,'',0.3)
-
-
-
-	i = 0
-	
-	'''
-	image2 = np.copy(image)
-	image3 = np.copy(image)
-	for p in sortedPoints[0]:
-		cv2.circle(image, (int(p.x),int(p.y)), 25, a[i], 3)
-
-	i=1	
-	for p in sortedPoints[1]:
-		cv2.circle(image2, (int(p.x),int(p.y)), 25, a[i], 3)
-	
-
-	i = 2
-	for p in sortedPoints[2]:
-		cv2.circle(image3, (int(p.x),int(p.y)), 25, a[i], 3)
-	
-	
-		
-	showImage(image,'',0.3)
-	showImage(image2,'',0.3)
-	showImage(image3,'',0.3)
-	'''
-	
-
 	return 0
+
+#25/01
+def constructTables(tablePoints,image):
+	tables = []
+	img = np.copy(image)
+	
+	startIndex = 0
+	directionsIndex = 0
+	completlySearched = True
+	directionsTransform = [3,4,1,2]		
+	tables = []
+
+	while True:
+		
+
+		if completlySearched:
+			startPoint = tablePoints[0]
+			tablePoints.remove(startPoint) 
+			directions = startPoint.directionCombos2()
+			directionsIndex = 0
+			directionsIndexMax = len(directions) - 1
+			sortedDirections = sortInToDirections(tablePoints)
+			printSizeTP(tablePoints,sortedDirections)
+			completlySearched  = False
+		
+
+		while True:
+			image1 = np.copy(image)
+
+			dirHor = directions[directionsIndex][0]
+			dirVer = directions[directionsIndex][1]
+
+			cv2.circle(image1, (startPoint.point.x,startPoint.point.y), 25, (255,0,0), 3)
+
+			edge1 = searchClosestPoint(startPoint,sortedDirections,dirHor,dirVer)
+			cv2.circle(image1, (edge1.point.x,edge1.point.y), 25, (0,255,0), 3)
+			if not edge1.containsDirection(dirVer):
+				if directionsIndex == directionsIndexMax:
+					completlySearched = True
+					break
+
+				directionsIndex = directionsIndex + 1
+				#showImage(image1,'hor',0.3)
+				continue
+
+			edge2 = searchClosestPoint(startPoint,sortedDirections,dirVer,dirHor)	
+			cv2.circle(image1, (edge2.point.x,edge2.point.y), 25, (0,0,255), 3)
+			if not edge2.containsDirection(dirHor):
+				if directionsIndex == directionsIndexMax:
+					completlySearched = True
+					break
+
+				directionsIndex = directionsIndex + 1
+				#showImage(image1,'ver',0.3)
+				continue
+			#showImage(image1,'end',0.3)
+			
+			edge3 = searchClosestPoint(edge1,sortedDirections,dirVer,directionsTransform[dirHor-1])
+			edge4 = searchClosestPoint(edge2,sortedDirections,dirHor,directionsTransform[dirVer-1])
+
+
+			#Should never be the case because of the direction constraint (Just to be sure)
+			if not distance(edge3.point,edge4.point) == 0:
+				print "Found edges don't match"
+				exit()
+
+			table = Rectangle.Rectangle(startPoint,edge1,edge2,edge3)
+			tables.append(table)
+			image3 = np.copy(image)
+			table.draw(image3)
+			showImage(image3,'',0.3)
+
+			tablePoints = removeDirections(table,tablePoints)
+			sortedDirections = sortInToDirections(tablePoints)
+			printSizeTP(tablePoints,sortedDirections)
+
+			#Points with any directions to search are removed by removeDirections
+			#If a point is completly searched, remove it from tablePoints
+			if directionsIndex == directionsIndexMax:
+					completlySearched = True
+					break
+			directionsIndex = directionsIndex + 1
+
+			#Controleer als niet alles gezocht is, te starten vanaf de huidige index hor en ver bij de volgende iteratie
+
+
+			a = 0
+			
+
+		
+		#showImage(image,'',0.3)
+
+
+
+def removeDirections(table,tablePoints):
+	for tp in tablePoints:
+		if distance(table.p1,tp.point) == 0:
+			tp.removeDirection(2)
+			tp.removeDirection(3)
+			if tp.amount == 0:
+				tablePoints.remove(tp)
+		elif distance(table.p2,tp.point) == 0:
+			tp.removeDirection(3)
+			tp.removeDirection(4)
+			if tp.amount == 0:
+				tablePoints.remove(tp)
+		elif distance(table.p3,tp.point) == 0:
+			tp.removeDirection(1)
+			tp.removeDirection(4)
+			if tp.amount == 0:
+				tablePoints.remove(tp)
+		elif distance(table.p4,tp.point) == 0:
+			tp.removeDirection(1)
+			tp.removeDirection(2)
+			if tp.amount == 0:
+				tablePoints.remove(tp)
+	return tablePoints
+
+def printSizeTP(tablePoints,sortedtablePoints):
+	print len(tablePoints), len(sortedtablePoints[0]), len(sortedtablePoints[1]), len(sortedtablePoints[2]), len(sortedtablePoints[3])
+
+
+#Start point is not necessairy to find last point
+#Assumption: uncessairy points are removed
+def findLastPoint(p1,p2,dir1,dir2):
+	if dir1 == 1 or dir1 == 3:
+		x = p1.point.x
+	elif dir1 == 2 or dir1 == 4:
+		y = p1.point.y
+
+	if dir2 == 1 or dir4 == 3:
+		x = p2.point.x
+	elif dir2 == 2 or dir2 == 4:
+		y = p2.point.y
+		
+
+
+def searchClosestPoint(tp,sortedDirections,direction,directionContraint):
+	wantedDirections = [3,4,1,2]
+	dir = sortedDirections[wantedDirections[direction-1]-1]
+
+	distances = np.zeros((len(dir)))
+	
+	for i in range(0,len(dir)):
+		tablep = dir[i]
+		distances[i] = tp.distanceToTablePoint(tablep,direction,directionContraint)
+
+	minIndex = np.argmin(distances)
+	closest = sortedDirections[wantedDirections[direction-1]-1][minIndex]
+	
+	return closest
+
+
+
+
+
 
 #Zie notes 24/1, 25/1
 def removeUnrelevantPoints(tablePoints,border):
+	sortedDirections = sortInToDirections(tablePoints)
 	temp = []
 	for tp in tablePoints:
 		
 		b = border.pointOnBorder(tp.point)
-		print b, tp.point
 		if b == 0: # => tp always relevant for table construction
 			temp.append(tp)
 		else:
-			#needToContain = [1,2,3,4]#[3,4,1,2] #Needs to have this direction otherwise not relevant for construction
-			needToContain = [3,4,1,2]
+			needToContain = [3,4,1,2] #Needs to have this direction otherwise not relevant for construction
 			if tp.containsDirection(needToContain[b-1]): #needToContain[b-1]
 				temp.append(tp)
-				a = "add"
-			else:
-				a ="not"
-			#print a, b, needToContain[b-1], tp.directions
-		
 
-	print len(temp), len(tablePoints)
 	return temp
+
+def sortInToDirections(tablePoints):
+	temp = []
+	for i in range(0,4):
+		temp.append([])
+	
+	for tp in tablePoints:
+		for dir in tp.directions:
+			temp[dir-1].append(tp)
+	return temp
+
 
 
 def sortPointsTables(tables,keypoints,pob1,pob2,pob3,border):

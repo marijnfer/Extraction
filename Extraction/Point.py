@@ -5,8 +5,8 @@ import numpy as np
 
 class Point:
 	def __init__(self,x_init,y_init):
-		self.x = x_init
-		self.y = y_init
+		self.x = int(x_init)
+		self.y = int(y_init)
 
 	def pointUnpack(self):
 		return self.x,self.y

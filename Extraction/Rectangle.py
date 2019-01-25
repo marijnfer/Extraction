@@ -4,11 +4,13 @@ Source: https://codereview.stackexchange.com/questions/151309/check-if-two-recta
 from Point import *
 import cv2
 import numpy as np
+from TablePoint import *
 
 class Rectangle:
 	# 4 punten genomen ipv 2 omdat de rechthoeken een beetje kunnen afwijken
 	# Bij init: punten formatten zodat p1 altijd het punt links boven,...
 	def __init__(self, p1,p2,p3,p4):
+		'''
 		if not isinstance(p1,Point):
 			p1 = arrayToPoint(p1)
 
@@ -20,7 +22,26 @@ class Rectangle:
 
 		if not isinstance(p4,Point):
 			p4 = arrayToPoint(p4)
+		'''
+		if type(p1) is np.ndarray :
+			p1 = arrayToPoint(p1)
+		elif isinstance(p1,TablePoint):
+			p1 = p1.point
 
+		if type(p2) is np.ndarray :
+			p2 = arrayToPoint(p2)
+		elif isinstance(p2,TablePoint):
+			p2 = p2.point
+
+		if type(p3) is np.ndarray :
+			p3 = arrayToPoint(p3)
+		elif isinstance(p3,TablePoint):
+			p3 = p3.point
+
+		if type(p4) is np.ndarray :
+			p4 = arrayToPoint(p4)
+		elif isinstance(p4,TablePoint):
+			p4 = p4.point
 
 
 		points = [p1,p2,p3,p4]

@@ -2,12 +2,10 @@ from Point import *
 import random
 import math
 
-
 from sklearn.cluster import DBSCAN
 from sklearn import metrics
 from sklearn.datasets.samples_generator import make_blobs
 from sklearn.preprocessing import StandardScaler
-
 
 class Cluster:
     def Cluster(self):
@@ -16,7 +14,7 @@ class Cluster:
 #Eenvoudiger om eps density clustering te setten
 def prepareBorder(pob):
     pob = np.copy(pob)
-    range = 100
+    range = 100 
     minX,maxX,minY,maxY = minMaxXY(pob)
     rangeX = maxX-minX
     rangeY = maxY-minY

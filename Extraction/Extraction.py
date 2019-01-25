@@ -18,7 +18,7 @@ import Cluster
 import time
 import TableConstruct
 
-saveImages = True
+saveImages = False
 savePath = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Extraction\\Extraction\\save\\'
 mainPath = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Drawings\\2.png'
 
@@ -73,12 +73,9 @@ def crosspointDetection(image):
 
 	# Morphological operation to detect verticle lines from an image
 	img_temp1 = cv2.erode(image, verticle_kernel, iterations=1)
-	showImage(img_temp1,"",0.3)#[1838:2338,2508:3308]
 
 	img_temp1 = cv2.dilate(img_temp1, verticle_kernel, iterations=1)
-	showImage(img_temp1,"",0.3)
 	img_verticle_lines = cv2.dilate(img_temp1, verticle_kernel1, iterations=3)
-	showImage(img_temp1,"",0.3)
 	# Morphological operation to detect horizontal lines from an image
 	img_temp2 = cv2.erode(image, hori_kernel, iterations=1)
 	img_temp2 = cv2.dilate(img_temp2, hori_kernel, iterations=1)
@@ -282,7 +279,7 @@ def keypointsOnBorder(keypoints, border,allowedDeviation,image):
 	# If structuur kan dus problemen opleverne
 	# Maar komt dit wel voor bij grote tekeningen en <= 2 ?
 	for point in keypoints:
-		if border.onBorder(point):
+		if border.pointBelongsToBorder(point):
 			a = 0
 		elif point.distanceToLine(border.p1,border.p2) <= 2:
 			pob1.append(point)
@@ -347,7 +344,8 @@ def deleteBorderFromKeypoints(border,keypoints, pob1,pob2,pob3,pob4,image):
 
 	loc = savePath + '9 delete outside border.png'
 	cv2.imwrite(loc,img)
-   
+
+
 
 
 		

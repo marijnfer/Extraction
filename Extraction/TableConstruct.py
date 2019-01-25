@@ -2,6 +2,7 @@ from Point import *
 import Cluster
 import cv2
 import Rectangle
+from TablePoint import *
 
 class TableConstruct:
 	global tollerance
@@ -14,7 +15,7 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image):
 	keypoints = keypoints[:]
 	tables = []
 	#Seperate distant points that don't belong to any table
-	pob1 = Cluster.clusterBorders(pob1)
+	pob1 = Cluster.clusterBorders(pob1) 
 	pob3 = Cluster.clusterBorders(pob3)
 
 	c2 = pob3[-1,:]
@@ -38,25 +39,128 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image):
 	index = index[0]
 
 	tables = findTables(pointsAbovePob2,index,tables,image,pob3)
-	sortedPoints = sortPointsTables(tables,keypoints,pob1,pob3)
-	image = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	a = [(255,0,0),(0,255,0),(0,0,255)]
-	for t in tables:
-		t.draw(image)
+	sortedPoints = sortPointsTables(tables,keypoints,pob1,pob2,pob3,border)
+
+	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+	image2 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+
+	#Convert points to tablePoints + remove unrelevant points
+	tablePoints = []
+	for i in range(0,len(sortedPoints)):
+		sp = sortedPoints[i]
+		temp = []
+		for p in sp:
+			temp.append(TablePoint(p,image))
+		temp = removeUnrelevantPoints(temp,tables[i])
+		tablePoints.append(temp)
+
+	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+	for tp in tablePoints[0]:
+		tp.draw(image1)
+	
+	showImage(image1,'',0.3)
+
+	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+	for tp in tablePoints[1]:
+		tp.draw(image1)
+	
+	showImage(image1,'',0.3)
+
+	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+	for tp in tablePoints[2]:
+		tp.draw(image1)
+	
+	showImage(image1,'',0.3)
+	
+	
+
+
+	'''
+	for p in test:
+
+		a = tables[2].pointOnBorder(p.point)
+		print a, p.point
+		point = Point(int(p.point.x),int(p.point.y))
+
+		if  a == 1:
+			cv2.circle(image1, (point.x,point.y), 25, (255,0,0), 3)
+		if  a == 2:
+			cv2.circle(image1, (point.x,point.y), 25, (0,255,0), 3)
+		if  a == 3:
+			cv2.circle(image1, (point.x,point.y), 25, (0,0,255), 3)
+		if  a == 4:
+			cv2.circle(image1, (point.x,point.y), 25, (255,255,0), 3)
+	print ""
+	
+	showImage(image1,'',0.3)
+	for tp in test:
+		tp.draw(image2)
+	showImage(image2,'',0.3)
+	'''
+
+	
+	
+	
+
+	for tp in test:
+		tp.draw(image2)
+	
+	showImage(image2,'',0.3)
+
+
+
 	i = 0
 	
-		
+	'''
+	image2 = np.copy(image)
+	image3 = np.copy(image)
 	for p in sortedPoints[0]:
 		cv2.circle(image, (int(p.x),int(p.y)), 25, a[i], 3)
+
+	i=1	
+	for p in sortedPoints[1]:
+		cv2.circle(image2, (int(p.x),int(p.y)), 25, a[i], 3)
+	
+
+	i = 2
+	for p in sortedPoints[2]:
+		cv2.circle(image3, (int(p.x),int(p.y)), 25, a[i], 3)
+	
 	
 		
 	showImage(image,'',0.3)
-
+	showImage(image2,'',0.3)
+	showImage(image3,'',0.3)
+	'''
 	
 
 	return 0
 
-def sortPointsTables(tables,keypoints,pob1,pob3):
+#Zie notes 24/1, 25/1
+def removeUnrelevantPoints(tablePoints,border):
+	temp = []
+	for tp in tablePoints:
+		
+		b = border.pointOnBorder(tp.point)
+		print b, tp.point
+		if b == 0: # => tp always relevant for table construction
+			temp.append(tp)
+		else:
+			#needToContain = [1,2,3,4]#[3,4,1,2] #Needs to have this direction otherwise not relevant for construction
+			needToContain = [3,4,1,2]
+			if tp.containsDirection(needToContain[b-1]): #needToContain[b-1]
+				temp.append(tp)
+				a = "add"
+			else:
+				a ="not"
+			#print a, b, needToContain[b-1], tp.directions
+		
+
+	print len(temp), len(tablePoints)
+	return temp
+
+
+def sortPointsTables(tables,keypoints,pob1,pob2,pob3,border):
 	sorted = []
 
 	for t in tables:
@@ -71,12 +175,23 @@ def sortPointsTables(tables,keypoints,pob1,pob3):
 		for j in range(0,len(tables)):
 			if tables[j].containsPoint(pob1[i,:]):
 				sorted[j].append(arrayToPoint(pob1[i,:]))
-                print i, pob1[i,:]
+
+	for i in range(0,pob2.shape[0]):
+		for j in range(0,len(tables)):
+			if tables[j].containsPoint(pob2[i,:]):
+				sorted[j].append(arrayToPoint(pob2[i,:]))
 
 	for i in range(0,pob3.shape[0]):
 		for j in range(0,len(tables)):
 			if tables[j].containsPoint(pob3[i,:]):
 				sorted[j].append(arrayToPoint(pob3[i,:]))
+
+
+	if tables[0].containsPoint(border.p3):
+		sorted[0].append(border.p3)
+
+	if tables[-1].containsPoint(border.p2):
+		sorted[-1].append(border.p2)
 
 
 	return sorted

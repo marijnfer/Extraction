@@ -56,7 +56,7 @@ class Rectangle:
 		if self.p1.x <= x and x <= self.p4.x:
 			if self.p1.y <= y and self.p2.y:
 				return True
-		return False
+		
 		'''
 		#Points near 
 		if distancePointToLine(self.p1,self.p2,x,y) <= 2:
@@ -72,7 +72,7 @@ class Rectangle:
 
 
 		
-	def onBorder(self,point):
+	def pointBelongsToBorder(self,point):
 		if distance(self.p1,point) == 0:
 			return True
 		elif distance(self.p2,point) == 0:
@@ -82,6 +82,21 @@ class Rectangle:
 		elif distance(self.p4,point) == 0:
 			return True
 		return False
+
+	def pointOnBorder(self,point):
+		if self.pointBelongsToBorder(point):
+			return 0
+
+
+		if distancePointToLine(self.p1,self.p2,point.x,point.y) <=2:
+			return 1
+		if distancePointToLine(self.p2,self.p3,point.x,point.y) <=2:
+			return 2
+		if distancePointToLine(self.p3,self.p4,point.x,point.y) <=2:
+			return 3
+		if distancePointToLine(self.p4,self.p1,point.x,point.y) <=2:
+			return 4
+		return 0
 
 
 	def draw(self,image):

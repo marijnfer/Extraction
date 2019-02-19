@@ -64,7 +64,7 @@ class Rectangle:
 		self.p3 = points[0]
 
 		
-
+	'''
 	def containsPoint(self,point):
 		if isinstance(point,Point):
 			x = point.x
@@ -74,11 +74,11 @@ class Rectangle:
 			y = point[1]
 
 		#Quick check if points lies between border
-		if self.p1.x <= x and x <= self.p4.x:
-			if self.p1.y <= y and self.p2.y:
+		if self.p1.x - 2 <= x and x <= self.p4.x + 2:
+			if self.p1.y - 2 <= y and self.p2.y + 2:
 				return True
+	
 		
-		'''
 		#Points near 
 		if distancePointToLine(self.p1,self.p2,x,y) <= 2:
 			return True
@@ -89,26 +89,24 @@ class Rectangle:
 		if distancePointToLine(self.p4,self.p1,x,y) <= 2:
 			return True
 		return False
-		'''
+	'''
 
 
-		
+		############
 	def pointBelongsToBorder(self,point):
-		if distance(self.p1,point) == 0:
+		if distance(self.p1,point) <= 2:
 			return True
-		elif distance(self.p2,point) == 0:
+		elif distance(self.p2,point) <= 2:
 			return True
-		elif distance(self.p3,point) == 0:
+		elif distance(self.p3,point) <=2:
 			return True
-		elif distance(self.p4,point) == 0:
+		elif distance(self.p4,point) <= 2:
 			return True
 		return False
 
 	def pointOnBorder(self,point):
 		if self.pointBelongsToBorder(point):
 			return 0
-
-
 		if distancePointToLine(self.p1,self.p2,point.x,point.y) <=2:
 			return 1
 		if distancePointToLine(self.p2,self.p3,point.x,point.y) <=2:
@@ -119,6 +117,19 @@ class Rectangle:
 			return 4
 		return 0
 
+	def containsPoint(self,point,offset):
+		if not isinstance(point,Point):
+			point = arrayToPoint(point)
+
+		xMin = self.p1.x
+		xMax = self.p3.x
+		yMin = self.p1.y
+		yMax = self.p3.y
+
+		if xMin-offset <= point.x and xMax+offset >= point.x:
+			if yMin-offset <= point.y and yMax+offset >= point.y:
+				return True
+		return False
 
 	def draw(self,image):
 		image = drawLine(self.p1,self.p2,image)
@@ -127,11 +138,36 @@ class Rectangle:
 		image = drawLine(self.p4,self.p1,image)
 		return image
 
+	def drawColor(self,image,color):
+		image = drawLineColor(self.p1,self.p2,image,color)
+		image = drawLineColor(self.p2,self.p3,image,color)
+		image = drawLineColor(self.p3,self.p4,image,color)
+		image = drawLineColor(self.p4,self.p1,image,color)
+		return image
+
+	def drawBorderPoints(self,points,image):
+		self.draw(image)
+		for p in points:
+			b = self.pointOnBorder(p)
+			if b == 1:
+				cv2.circle
+
 	#True als de eerste rechthoek de tweede volledig omvat (mogen samenvallen maar niet kruisen)
+	#Tolerantie nodig?
 	def contains(self,r):
 		if distance(self.p1,Point(0,0)) <= distance(r.p1,Point(0,0)):
 			if distance(self.p2,Point(0,0)) >= distance(r.p2,Point(0,0)):
 				return True
+		return False
+
+	#For table construction
+	def contains2(self,r):
+		tolerance = 2
+		if self.p1.y - tolerance <= r.p1.y:
+			if self.p1.x - tolerance <= r.p1.x:
+				if self.p2.y + tolerance >= r.p2.y:
+					if self.p4.x + tolerance >= r.p4.x:
+						return True
 		return False
 
 	def is_intersect(self, other):
@@ -163,9 +199,27 @@ class Rectangle:
 
 	def __str__(self):
 		return 'Rectangle({self.min_x},{self.max_x},{self.min_y},{self.max_y})'.format(self=self)
-
+	
 	@property
 	def area(self):
 		return (self.p3.x - self.p2.x) * (self.p2.y - self.p1.y)
 
-	
+def largerstBorder(borders):
+	largest = None
+	size = 0
+	for b in borders:
+		if b.area > size:
+			largest = b
+			size = b.area
+	return largest
+
+def combine(r1,r2):
+	#Find common edge
+	if distance(r1.p2, r2.p3) <= 2 and distance(r1.p1,r2.p4) <= 2:
+		return Rectangle(r2.p1,r2.p2,r1.p3,r1.p4)
+	if distance(r1.p2,r2.p1) <= 2 and distance(r1.p3,r2.p4) <= 2:
+		return Rectangle(r2.p2,r2.p3,r1.p1,r1.p4)
+	if distance(r1.p3,r2.p2) <= 2 and distance(r1.p4,r2.p1) <= 2:
+		return Rectangle(r2.p3,r2.p4,r1.p1,r1.p2)
+	if distance(r1.p1,r2.p2) <= 2 and distance(r1.p4,r2.p3) <= 2:
+		return Rectangle(r2.p1,r2.p4,r1.p2,r1.p3)

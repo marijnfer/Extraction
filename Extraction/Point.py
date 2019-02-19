@@ -64,7 +64,11 @@ def pointOccursInList(p,list, allowedDeviation):
 
 
 def drawLine(point1,point2,image):
-	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),5)
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),3)
+	return image
+
+def drawLineColor(point1,point2,image,color):
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),color,1)
 	return image
 
 def minMaxXY(numpyAr):

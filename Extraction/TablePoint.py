@@ -4,6 +4,7 @@ from Point import *
 class TablePoint:
 	def __init__(self, point,image):
 		self.point = point
+		#Directions give an indication where to search (compute line checks only once)
 		self.directions = determineDirections(point,image)
 		self.amount = len(self.directions)
 
@@ -31,10 +32,10 @@ class TablePoint:
 			if 3 in self.directions:
 				self.s[3] = self.s[3] + 1
 
-
-
 	def removeDirection(self,dir):
 		self.s[dir - 1] = self.s[dir - 1] - 1
+		if self.s[dir - 1] < 0:
+			print "neg", self.point,dir
 		if self.s[dir - 1] == 0:
 			self.directions.remove(dir)
 			self.amount = len(self.directions)
@@ -57,7 +58,7 @@ class TablePoint:
 	#Only to return valid points (Line needs to exist)
 	#Notes 25/1 p2
 	def distanceToTablePoint(self, tp,direction,directionContraint):
-		offset = 2
+		offset = 1
 		xSelf = self.point.x
 		ySelf = self.point.y
 
@@ -120,14 +121,23 @@ class TablePoint:
 		return temp
 	
 	def draw(self,image):
+		length = 5
 		if 1 in self.directions:
-			drawLine(self.point,self.point.transpose(-20,0),image)
+			drawLine(self.point,self.point.transpose(-length,0),image)
 		if 2 in self.directions:
-			drawLine(self.point,self.point.transpose(0,20),image)
+			drawLine(self.point,self.point.transpose(0,length),image)
 		if 3 in self.directions:
-			drawLine(self.point,self.point.transpose(20,0),image)
+			drawLine(self.point,self.point.transpose(length,0),image)
 		if 4 in self.directions:
-			drawLine(self.point,self.point.transpose(0,-20),image)
+			drawLine(self.point,self.point.transpose(0,-length),image)
+
+		#TP is a valid point if it minimum consits of 1 pair of 90 degrees directions
+	def validCorner(self):
+		sum1 = self.s[0] + self.s[1]
+		sum2 = self.s[2] + self.s[3]
+		if sum1 >= 1 and sum2 >= 1:
+			return True
+		return False
 
 def determineDirections(point,image):
 	directions = []
@@ -135,41 +145,48 @@ def determineDirections(point,image):
 	x = int(point.x)
 	y = int(point.y)
 
-	#img1 = image[y-1:y + 2,x-20:x]
-	#img2 = np.transpose(image[y:y+20,x-1:x + 2])
-	#img3 = image[y-1:y + 2,x:x+20]
-	#img4 = np.transpose(image[y-20:y,x-1:x + 2])
+	length = 5
+
+	img1 = image[y-1:y + 2,x-length:x]
+	img2 = np.transpose(image[y:y+length,x-1:x + 2])
+	img3 = image[y-1:y + 2,x:x+length]
+	img4 = np.transpose(image[y-length:y,x-1:x + 2])
 	#Geen interval nemen: zie notes 24/
-	img1 = image[y,x-20:x]
-	img2 = np.transpose(image[y:y+20,x])
-	img3 = image[y,x:x+20]
-	img4 = np.transpose(image[y-20:y,x])
-
-	#line1 = np.max(img1,axis=0)
-	#line2 = np.max(img2,axis=0)
-	#line3 = np.max(img3,axis=0)
-	#line4 = np.max(img4,axis=0)
-
-	#filled1 = float(np.count_nonzero(line1)) / line1.shape[0]
-	#filled2 = float(np.count_nonzero(line2)) / line2.shape[0]
-	#filled3 = float(np.count_nonzero(line3)) / line3.shape[0]
-	#filled4 = float(np.count_nonzero(line4)) / line4.shape[0]
+	'''
+	img1 = image[y,x-length:x]
+	img2 = np.transpose(image[y:y+length,x])
+	img3 = image[y,x:x+length]
+	img4 = np.transpose(image[y-length:y,x])
 
 	filled1 = float(np.count_nonzero(img1)) / img1.shape[0]
 	filled2 = float(np.count_nonzero(img2)) / img2.shape[0]
 	filled3 = float(np.count_nonzero(img3)) / img3.shape[0]
 	filled4 = float(np.count_nonzero(img4)) / img4.shape[0]
+	'''
 
-	if filled1 >= 0.995:
+	line1 = np.max(img1,axis=0)
+	line2 = np.max(img2,axis=0)
+	line3 = np.max(img3,axis=0)
+	line4 = np.max(img4,axis=0)
+
+	filled1 = float(np.count_nonzero(line1)) / line1.shape[0]
+	filled2 = float(np.count_nonzero(line2)) / line2.shape[0]
+	filled3 = float(np.count_nonzero(line3)) / line3.shape[0]
+	filled4 = float(np.count_nonzero(line4)) / line4.shape[0]
+
+	
+	#####
+	#Alow broken lines due to binairy conversion
+	if filled1 >= 0.8:
 		directions.append(1)
 		
-	if filled2 >= 0.995:
+	if filled2 >= 0.8:
 		directions.append(2)
 
-	if filled3 >= 0.995:
+	if filled3 >= 0.8:
 		directions.append(3)
 
-	if filled4 >= 0.995:
+	if filled4 >= 0.8:
 		directions.append(4)
 
 	return directions

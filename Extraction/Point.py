@@ -11,31 +11,29 @@ class Point:
 	def pointUnpack(self):
 		return self.x,self.y
 
-	def __repr__(self):
-		return "".join(["Point(", str(self.x), ",", str(self.y), ")"])
-
 	def pointToArray(self):
 		array = np.zeros(2)
 		array[0] = self.x
 		array[1] = self.y
 		return array
 
-
+	#Calulates distance from self to line (p1,p2)
 	def distanceToLine(self,p1,p2):
 		p3 = self.pointToArray()
 		p2 = p2.pointToArray()
 		p1 = p1.pointToArray()
 
-		#negatieve afstand      np.cross(p2-p1,p3-p1)/norm(p2-p1)
-		return norm(np.cross(p2-p1, p1-p3))/norm(p2-p1) #positieve afstand
+		return norm(np.cross(p2-p1, p1-p3))/norm(p2-p1) 
 
 	def transpose(self,x,y):
 		return Point(self.x+x,self.y+y)
 
 
+#Distance from point a to b
 def distance(a, b):
 	return sqrt((a.x-b.x)**2+(a.y-b.y)**2)
 
+#Determine all points with equal x taking allowDeviation into account
 def equalX(x,pointList, allowedDeviation):
 	temp = []
 	for point in pointList:
@@ -43,6 +41,7 @@ def equalX(x,pointList, allowedDeviation):
 			temp.append(point)
 	return temp
 
+#Determine all points with equal y taking allowDeviation into account
 def equalY(y,pointList,allowedDeviation):
 	temp = []
 	for point in pointList:
@@ -53,8 +52,8 @@ def equalY(y,pointList,allowedDeviation):
 def arrayToPoint(array):
 	return Point(array[0],array[1])
 
-# Eventueel mogelijk afwijkingen in rekening brengen 
-# Daarom geen x == x1 en y == y1
+
+#Determine all points to are less than allowedDeviation removed from p
 def pointOccursInList(p,list, allowedDeviation):
 	for i in range(0,len(list)):
 		point = list[i]
@@ -64,13 +63,14 @@ def pointOccursInList(p,list, allowedDeviation):
 
 
 def drawLine(point1,point2,image):
-	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),3)
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),2)
 	return image
 
 def drawLineColor(point1,point2,image,color):
-	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),color,1)
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),color,3)
 	return image
 
+#Determine minimum - maximum x - y values of array of points
 def minMaxXY(numpyAr):
 	minX = np.min(numpyAr[:,0])
 	maxX = np.max(numpyAr[:,0])
@@ -79,7 +79,7 @@ def minMaxXY(numpyAr):
 
 	return minX,maxX,minY,maxY
 
-
+#Determine minimum y-coordinate of all points in the list
 def minimumY(list):
 	temp = []
 	smallest = 999999
@@ -88,6 +88,7 @@ def minimumY(list):
 			smallest = point.y
 	return smallest
 
+#Determine maximum y-coordinate of all points in the list
 def maximumY(list):
 	temp = []
 	largest = 0
@@ -96,6 +97,7 @@ def maximumY(list):
 		   largest = point.y
 	return largest
 
+#Determine minimum x-coordinate of all points in the list
 def minimumX(list):
 	temp = []
 	smallest = 999999
@@ -104,6 +106,7 @@ def minimumX(list):
 			smallest = point.x
 	return smallest
 
+#Determine maximum x-coordinate of all points in the list
 def maximumX(list):
 	largest = 0
 	for point in list:
@@ -111,7 +114,7 @@ def maximumX(list):
 		   largest = point.x
 	return largest
 
-def pointToArrayList(list):
+def pointsToArrayList(list):
 	temp = np.zeros((len(list),2))
 	
 	for i in range(0,len(list)):
@@ -120,33 +123,39 @@ def pointToArrayList(list):
 
 	return temp
 
-
-def boundaries(p1,p2):
-	if p1.x >= p2.x:
-		maxx = p1.x
-		minx = p2.x
-	else:
-		maxx = p2.x
-		minx = p1.x
-
-	if p1.y >= p2.y:
-		maxy = p1.y
-		miny = p2.y
-	else:
-		maxy = p2.y
-		miny = p1.y
-
-	return minx,maxx, miny, maxy
-
-def averagePoint(list):
-	x = 0
-	y = 0
-	for p in list:
-		x += p.x
-		y += p.y
-	return Point(x/len(list),y/len(list))
-
 def distancePointToLine(p1,p2,x,y):
 	d1 = (p2.x-p1.x)*(p1.y-y) - (p1.x-x)*(p2.y - p1.y)
 	d1 = abs(d1)/ ((p2.x-p1.x)**2+(p2.y-p1.y)**2)**0.5
 	return d1
+
+#Determine if an actual line is present on the image
+def lineDetector(p1,p2,image):
+	if isinstance(p1,Point):
+		p1 = p1.pointToArray()
+		p2 = p2.pointToArray()
+
+	if abs(p1[0] - p2[0]) >= 8 and abs(p1[1] - p2[1]) >= 8:
+		return False #vertical or horizontal
+
+	array = np.vstack((p1,p2))
+	array = array.astype(int)
+	minX,maxX, minY, maxY = minMaxXY(array)
+
+
+	rx1 = minX - 2
+	rx2 = maxX + 3
+	ry1 = minY - 2
+	ry2 = maxY + 3
+	segment = image[ry1:ry2,rx1:rx2]
+   
+	if segment.shape[0] > segment.shape[1]:
+		line = np.max(segment,axis=1)
+	else:
+		line = np.max(segment,axis=0)
+	
+
+	filled = np.count_nonzero(line) / float(line.shape[0])
+	if filled >= 0.80: 
+		return True
+   
+	return False

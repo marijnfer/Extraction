@@ -1,5 +1,4 @@
 from Point import *
-import Cluster
 import cv2
 import Rectangle
 from TablePoint import *
@@ -9,45 +8,58 @@ import os
 from random import randint
 import TableTemplate
 import Table
+import time
 
+saveImages = True
+showImages = False
+scale = 0.7
 
-saveImage = True
-savePathBorder = ''
 class TableConstruct:
 	global tollerance
 	tollerance = 5
-	#Eventueel alle keypoints filteren
 	def __init__(self):
 		self
 
-def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,number):
-	savePathBorder = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Extraction\\Extraction\\save\\{}\\border\\'.format(number)
-	savePath = 'C:\\Users\\MarijnFerrari\\Documents\\Thesis\\Extraction\\Extraction\\save\\{}\\'.format(number)
+def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSavePath,orginalImagePath, cellOCRPath):
+
+
+	start  = time.clock()
+
 	keypoints = keypoints[:]
 	tables = []
-	#Seperate distant points that don't belong to any table
-	pob1 = Cluster.clusterBorders(pob1) 
-	pob3 = Cluster.clusterBorders(pob3)
 
-	'''
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for tp in keypoints:
-		cv2.circle(image1, (tp.x,tp.y), 5, (255,0,0), 1)
-	showImage(image1,'1',5)
-	'''
+	#Remove centering marks on left and right border
+	midLeft = Point(border.p1.x,(border.p1.y + border.p2.y) / 2)
+	midRight = Point(border.p3.x,(border.p3.y + border.p4.y) / 2)
+
+	pob1 = [p for p in pob1 if distance(p,midLeft) > 0.03 * image.shape[0]]
+	pob3 = [p for p in pob3 if distance(p,midRight) > 0.03 * image.shape[0]]
+	
+	pob1.sort(key = lambda p: p.y,reverse = True)
+	pob2.sort(key = lambda p: p.x,reverse = True)
+	pob3.sort(key = lambda p: p.y,reverse = True)
+	pob4.sort(key = lambda p: p.x,reverse = True)
+
+	pob1 = pointsToArrayList(pob1)
+	pob2 = pointsToArrayList(pob2)
+	pob3 = pointsToArrayList(pob3)
+	pob4 = pointsToArrayList(pob4)
 
 	c2 = pob3[-1,:]
 	possibleC3 = pointsInInterval(0,c2[0],c2[1],keypoints)
 
-	try:
+	if possibleC3.size == 0: 
+		possibleC3 = pob1[-1,:]
+	elif pob1.size > 0:
 		possibleC3 = np.vstack((pob1[-1,:],possibleC3))
-		possibleC4 = np.vstack((border.p2.pointToArray(),pob2))
-	except:
-		possibleC4 = pob2
 
+	possibleC4 = np.vstack((pob2,border.p2.pointToArray()))
 
-	table1, c11,c12,c13,c14 = findCorners(border.p3.pointToArray(),c2,possibleC3, possibleC4,image)
+	table1 = findTitleBlock(border.p3.pointToArray(),c2,possibleC3, possibleC4,image)
 	tables.append(table1)
+
+	print "Title block detection			", "%.3gs" % (time.clock() - start)
+	start = time.clock()
 
 	if pob1.size <= 2:
 		minHeigth = pob3[-1,1]
@@ -57,43 +69,30 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,number):
 	else:  
 		minHeigth = pob3[-1,1]
 		
+
 	pointsAbovePob2 = sortPointsAbovePOB2(pob2,keypoints,border.p2.pointToArray(),pob1,minHeigth)
-	'''
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for a in pointsAbovePob2:
-		for p in a:
-			cv2.circle(image1, (int(p[0]),int(p[1])), 5, (255,0,0), 1)
-	showImage(image1,'2',1)
-	'''
+	pob2 = np.vstack((pob2,border.p2.pointToArray()))
 
 	#Search next point on pob to start searching from
+	for index in range(pob2.shape[0]):
+		if pob2[index,0] == table1.p2.x:
+			break
 
-	index,_ = np.where(pob2 == c13)
-	if not index.size == 0: # if 0 => 1 table spans the entire border
-		index = index[0]
+	tables = findSubTables(pointsAbovePob2,index,tables,image,pob3) 
 
-		tables = findTables(pointsAbovePob2,index,tables,image,pob3) 
-	
-	img =  cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+	img = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
+	for t in tables:
+			t.draw(img)
+	if saveImages:
+		loc = savePath + '12 detected tables.png'
+		cv2.imwrite(loc,img)    
+	showImage(img,"Detected tables")
 
-	for i in range(0,len(tables)):
-			#loc = savePathBorder + '{}.png'.format(i)
-			tables[i].draw(img)
+	print "Detect substables			", "%.3gs" % (time.clock() - start)
+	start = time.clock()
 
-	showImage(img,'tables',0.3)
-
-
-
-	
-	sortedPoints = sortPointsTables(tables,keypoints,pob1,pob2,pob3,border)
-	
-	'''
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for p in sortedPoints[0]:
-		cv2.circle(image1, (p.x,p.y), 5, (255,0,0), 1)
-	showImage(image1,'3',1)
-	'''
-
+	sortedPoints = addBorderPointsToSortedPoints(tables,keypoints,pob1,pob2,pob3,border)
+		
 	#Convert points to tablePoints + remove unrelevant points
 	tablePoints = []
 
@@ -103,59 +102,146 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,number):
 		for p in sp:
 			temp.append(TablePoint(p,image))
 		temp = removeUnrelevantPoints(temp,tables[i])
+
 		tablePoints.append(temp)
 	
-	'''
-	image1 = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
-	for p in tablePoints[0]:
-		cv2.circle(image1, (p.point.x,p.point.y), 5, (255,0,0), 1)
-	showImage(image1,'4',1)
-	'''
+	img = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)	
+	for table in tablePoints:
+		for tp in table:
+			tp.draw(img)
+
+	if saveImages:
+		loc = savePath + '13 cell points with direction.png'.format(i)
+		cv2.imwrite(loc,img)    
+	showImage(img,'Cells points')
+		
 
 	formattedTables = []
 	for i in range(0,len(tables)):
-		formattedTables.append(constructTables(tablePoints[i],tables[i],image))
+		formattedTables.append(constructCells(tablePoints[i],tables[i],image))
 
 	
-	img =  cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+	img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
 	for i in range(0,len(tables)):
 	
 			for j in range(0,len(formattedTables[i])):
 				formattedTables[i][j].draw(img)
 				
-	showImage(img,'aaaa',1)
 
 	
 	#Draw borders and tables
-	if saveImage:
-		files = glob.glob(savePathBorder + '*')
-		for f in files:
-			os.remove(f)
-
+	if saveImages:
+		img0  = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+		imgOriginal = cv2.imread(orginalImagePath, 0)
 		for i in range(0,len(tables)):
-			loc = savePathBorder + '{}.png'.format(i)
-			img =  cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
-			tables[i].draw(img)
-			
-			cv2.imwrite(loc,img)    
-
+			loc = cellSavePath + '{}.png'.format(i)
+			img1 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+			tables[i].draw(img0)
+			tables[i].draw(img1)
+			cv2.imwrite(loc,img1)    
 			for j in range(0,len(formattedTables[i])):
-				loc = savePathBorder + '{} {}.png'.format(i,j)
-				img2 = np.copy(img)
-
-				formattedTables[i][j].draw(img2)
-				
+				loc = cellSavePath + '{} {}.png'.format(i,j)
+				img2 = np.copy(img1)
+				t = formattedTables[i][j]
+				t.draw(img0)	
+				t.draw(img2)	
 				cv2.imwrite(loc,img2)
-	
-	#i = 0
-	#tableHierachy(tables[i],formattedTables[i],image)
-	
 
+				loc = cellOCRPath + '{} {}.png'.format(i,j)
+
+				minX = min(t.p1.x,t.p2.x)
+				maxX = max(t.p3.x,t.p4.x)
+				minY =  min(t.p1.y,t.p4.y)
+				maxY =  max(t.p2.y,t.p3.y)
+
+				cv2.imwrite(loc, imgOriginal[minY:maxY,minX:maxX])
+
+		loc = savePath + "14 Detected tabels and cells.png"
+		cv2.imwrite(loc,img0)
+
+	print "Detect cells				", "%.3gs" % (time.clock() - start)
+
+
+
+	
+	#tableHierachy(tables[i],formattedTables[i],image)
 
 	return formattedTables
 
-#31/01
 
+
+#Construct title block based on known points (rightside) 
+#c3 c4: array of possible points
+def findTitleBlock(c1,c2,c3,c4,image):
+	corner3 = []
+	if c3.size == 2:
+		if lineDetector(c2,c3,image):
+			corner3.append(c3)
+	else:
+		for i in range(0,c3.shape[0]):
+			if lineDetector(c2,c3[i,:],image):
+				corner3.append(c3[i,:])
+	
+	if len(corner3) == 0:
+		print("Corner 3 not found")
+		exit()
+
+	img = np.copy(image)
+	
+	#Compute canidates c4
+	corner4 = []
+	if c4.size == 2:
+		if lineDetector(c1,c4,image):
+			corner4.append(c4)
+	else:
+		for i in range(0,c4.shape[0]):
+			if lineDetector(c1,c4[i,:],image):
+				corner4.append(c4[i,:])
+
+	if len(corner4) == 0:
+		print("Corner 4 not found")
+		exit()
+
+	found = False
+	borders = []
+
+
+	for cor3 in corner3:
+		for cor4 in corner4:
+			if lineDetector(cor3,cor4,image):
+				c3 = cor3
+				c4 = cor4
+				b = Rectangle.Rectangle((c1),(c2),(c3),(c4))
+				borders.append(b)
+				found = True
+	
+	if found:
+		b = Rectangle.largestRectangle(borders) 
+		
+		return b
+		
+	else:
+		print("Corner3 and 4 don't match")
+		exit()
+
+def pointsInInterval(minX,maxX,ySearch,points):
+	global tollerance
+	interval = []
+	for p in points:
+		x, y = p.pointUnpack()
+
+		contains = False
+		if (ySearch - tollerance) <= y and y <= (ySearch + tollerance):
+			if (minX - tollerance) <= x and x <= (maxX + tollerance):
+				interval.append(p)
+	
+	if len(interval) == 1:
+		return interval[0].pointToArray()
+
+	return pointsToArrayList(interval)
+
+
+#31/01
 def tableHierachy(tableBorder,tables,image):
 	tempTables = [Table.Table(None,tables,False,tableBorder)]
 	#tempBorders = [tableBorder]
@@ -177,7 +263,7 @@ def tableHierachy(tableBorder,tables,image):
 			if not matchListVer is None:
 				for m in matchListVer:
 					cv2.line(imageDraw,(m[0].x,m[0].y),(m[1].x,m[1].y),(0,255,0),3)
-			showImage(imageDraw,'matches',1)
+			#showImage(imageDraw,'matches',1)
 	
 		direction = continueDirection(pob1,pob2,pob3,pob4,matchListHor,matchListVer)
 
@@ -226,7 +312,7 @@ def tableHierachy(tableBorder,tables,image):
 def determineBordersFromMatchList(ml):
 	borders = []
 	for i in range(1,len(ml)):
-		borders.append(Rectangle.Rectangle(ml[i-1][0],ml[i-1][1],ml[i][0],ml[i][1]))
+		borders.append(Rectangle.Rectangle(ml[i - 1][0],ml[i - 1][1],ml[i][0],ml[i][1]))
 	return borders
 
 def clusterTables(groupedTables,direction,borders):
@@ -241,7 +327,7 @@ def clusterTables(groupedTables,direction,borders):
 	while True:#Handle formatted table outputed by tableTemplate
 		# indexStart,indexStop
 	
-		tt = TableTemplate.formatTable(groupedTables[indexStart:indexStop+1],borders[indexStart:indexStop+1])
+		tt = TableTemplate.formatTable(groupedTables[indexStart:indexStop + 1],borders[indexStart:indexStop + 1])
 		if not tt is None:
 			indexStop = indexStop + 1	
 		else:
@@ -260,12 +346,12 @@ def clusterTables(groupedTables,direction,borders):
 			if not tt is None:
 				resultingTables.append(tt)
 			else:
-				b = Rectangle.combine(borders[indexStart],borders[indexStop+1])
-				resultingTables.append(Table.Table(None,groupedTables[indexStart:indexStop+1],False,b))
+				b = Rectangle.combine(borders[indexStart],borders[indexStop + 1])
+				resultingTables.append(Table.Table(None,groupedTables[indexStart:indexStop + 1],False,b))
 			break
 
 		ttPrevious = tt
-		#When does do two colomn and rows belong to the same 
+		#When does do two colomn and rows belong to the same
 
 	for ft in resultingTables:
 		ft.setDirection(direction)
@@ -277,8 +363,8 @@ def groupTables(matchlist,tables,image):
 	#Construct borders
 	borders = []
 	sortedTables = []
-	for i in range(0,len(matchlist)-1):
-		b = Rectangle.Rectangle(matchlist[i][0],matchlist[i][1],matchlist[i+1][0],matchlist[i+1][1])
+	for i in range(0,len(matchlist) - 1):
+		b = Rectangle.Rectangle(matchlist[i][0],matchlist[i][1],matchlist[i + 1][0],matchlist[i + 1][1])
 		borders.append(b)
 		sortedTables.append([])
 		#b.drawColor(image, (randint(0,255),randint(0,255),randint(0,255)))
@@ -298,7 +384,7 @@ def groupTables(matchlist,tables,image):
 			color = (randint(0,255),randint(0,255),randint(0,255))
 			for t in s:
 				t.drawColor(image,color)
-		showImage(image,'groupedTables',1)
+		#showImage(image,'groupedTables',1)
 
 
 	return sortedTables
@@ -314,9 +400,10 @@ def sortMatchList(matchlist,direction):
 #To decide to continu in horizontal or vertical direction
 #True = continue horizontal; False = vertical
 #Add cases during testing !!!!
-#Werken met het minste verschil in matchListen sizes (indien links/rechts, b/o zelde grootte hebben)
+#Werken met het minste verschil in matchListen sizes (indien links/rechts, b/o
+#zelde grootte hebben)
 def continueDirection(pob1,pob2,pob3,pob4,matchListHor,matchListVer):
-	# 1. Only 2 matches => continue with the order one
+	# 1.  Only 2 matches => continue with the order one
 	if len(matchListHor) == 2 and len(matchListVer) > 2:
 		return False
 	if len(matchListVer) == 2 and len(matchListHor) > 2:
@@ -361,7 +448,7 @@ def pointsOnBorder(border,points,image):
 			cv2.circle(image, (p.x,p.y), 25, (0,0,255), 3)
 		for p in pob4:
 			cv2.circle(image, (p.x,p.y), 25, (255,255,0), 3)
-		showImage(image,'',1)
+		#showImage(image,'',1)
 	return pob1,pob2,pob3,pob4
 
 #Points needed to construct the border
@@ -377,177 +464,204 @@ def relevantPoints(tables):
 
 	return points
 
-def test(tablePoints):
-	for tp in tablePoints:
-		if tp.point.x == 18:
-			if tp.point.y == 1065:
-				return True
-	return False
+
 #25/01
-def constructTables(tablePoints,tableBorder,image):
+def constructCells(tablePoints,tableBorder,image):
 	img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
 
 
-	for tp in tablePoints:
-		tp.draw(img)
-	showImage(img,'tps',1)
-
+	
 	tables = []
-	img = np.copy(image)
 	
 	startIndex = 0
 	directionsIndex = 0
 	completlySearched = True
-	directionsTransform = [3,4,1,2]     
+	directionsTransform = [3,4,1,2] #Opposite if [1,2,3,4] to determine which direction to search
 	tables = []
 	done = False
-	aa = False
 	
-	try:
-		while not done:
-			if completlySearched:
-				startPoint = tablePoints[0]
-	
-				tablePoints.remove(startPoint) 
-				directions = startPoint.directionCombos2()
-				directionsIndex = 0
-				directionsIndexMax = len(directions) - 1
-				sortedDirections = sortInToDirections(tablePoints)
-				completlySearched  = False
-			
 
-			while True:
-				if test(tablePoints)==False:
-					a = 0
-				if len(tables) == 9:
-						a = 0
-				image1 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
-				dirHor = directions[directionsIndex][0]
-				dirVer = directions[directionsIndex][1]
+	while not done:
+		if completlySearched:
+			if len(tablePoints) == 0: break;
 
-				cv2.circle(image1, (startPoint.point.x,startPoint.point.y), 3, (255,0,0), 3)
-				edges1 = searchClosestPointsss(startPoint,sortedDirections,dirHor,dirVer)
+
+			startPoint = tablePoints[0]
+
+			if startPoint.point.x == 1285 and startPoint.point.y == 1193:
+				a = 0
+			tablePoints.remove(startPoint) 
+			directions = startPoint.directionCombos2()
+			directionsIndex = 0
+			directionsIndexMax = len(directions) - 1
+			sortedDirections = sortInToDirections(tablePoints)
+			completlySearched = False
+
+		while True:				
+			dirHor = directions[directionsIndex][0]
+			dirVer = directions[directionsIndex][1]
+
+
+			edges1 = searchValidEdges(startPoint,sortedDirections,dirHor,dirVer) #Search horizontally
+			if not edges1 == None and len(edges1) > 1:
 				
-				if edges1 is None:
-					if directionsIndex == directionsIndexMax:
-						completlySearched = True
-						break
-					directionsIndex = directionsIndex + 1
-					continue
-					
-								
-				edges2 = searchClosestPointsss(startPoint,sortedDirections,dirVer,dirHor)   
+				img =  cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
+				startPoint.draw(img)
+				cv2.circle(img, (startPoint.point.x,startPoint.point.y), 10, (255,0,0), 4)
 
-				if edges2 is None:
-					if directionsIndex == directionsIndexMax:
-						completlySearched = True
-						break
-					directionsIndex = directionsIndex + 1
-					continue
-
-				aa = False
-				for ii in range(0,len(edges1)):
-					if (aa): 
-						break
-					edge1 = edges1[ii]
-					if not edge1.containsDirection(dirVer):
-						if directionsIndex == directionsIndexMax:
-							completlySearched = True
-							break
-
-						directionsIndex = directionsIndex + 1
-						#showImage(image1,'hor',0.3)
-						continue
-
-					for jj in range(0,len(edges2)):
-						if (aa):
-							break
-						edge2 = edges2[jj]
-						if not edge2.containsDirection(dirHor):
-							if directionsIndex == directionsIndexMax:
-								completlySearched = True
-								break
-
-							directionsIndex = directionsIndex + 1
-							#showImage(image1,'ver',0.3)
-							continue
-						image1 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
-						cv2.circle(image1, (startPoint.point.x,startPoint.point.y), 3, (0,255,255), 4)
-						cv2.circle(image1, (edge1.point.x,edge1.point.y), 3, (255,0,0), 4)
-						cv2.circle(image1, (edge2.point.x,edge2.point.y), 3, (0,255,0), 4)
-
-						try:
-							edge3 = searchClosestPoint(edge1,sortedDirections,dirVer,directionsTransform[dirHor-1])
-						
-							table = Rectangle.Rectangle(startPoint,edge1,edge2,edge3)
-							cv2.circle(image1, (edge3.point.x,edge3.point.y), 3, (0,0,255), 4)
-							#showImage(image1,'3',1)
-							tables.append(table)
-
-							image1 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
-							table.draw(image1)
-							#showImage(image1,'fff',1)
-			
-							tablePoints = removeDirections(table,tablePoints)
-							sortedDirections = sortInToDirections(tablePoints)
-						
-							aa = True
-						except:
-							a = 0
-		
-
-					
-
+				for e in edges1:
+					e.draw(img)
+				#showImage(img,"edges1",1)
 					
 
 
-						#Points with any directions to search are removed by removeDirections
-						#If a point is completly searched, remove it from tablePoints
-
-					
+			if edges1 is None:
 				if directionsIndex == directionsIndexMax:
-						completlySearched = True
-						break
-							
+					completlySearched = True
+					break
 				directionsIndex = directionsIndex + 1
-	except:
-		return tables
+				continue
+							
+			edges2 = searchValidEdges(startPoint,sortedDirections,dirVer,dirHor) #Search vertically
+			if not edges2 == None and len(edges2) > 1:
+				img =  cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
+				startPoint.draw(img)
+				cv2.circle(img, (startPoint.point.x,startPoint.point.y), 10, (255,0,0), 4)
+
+				for e in edges2:
+					e.draw(img)
+				#showImage(img,"edges2",1)
+
+
+			if edges2 is None:
+				if directionsIndex == directionsIndexMax:
+					completlySearched = True
+					break
+				directionsIndex = directionsIndex + 1
+				continue
+
+			stop = False
+
+
+
+			for i in range(0,len(edges1)):
+				if(stop): break;
+
+				edge1 = edges1[i]
+
+				for j in range(0,len(edges2)):
+					edge2 = edges2[j]
+					
+					edge3 = searchEdge3(edge1,edge2, sortedDirections, dirVer,directionsTransform[dirHor - 1])
+
+					if edge3 is None:
+						break		
+					table = Rectangle.Rectangle(startPoint,edge1,edge2,edge3)
+					if False and len(tables) == 22:
+						img = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)	
+						for table in tablePoints:
+								table.draw(img)
+						cv2.imshow("1",cv2.resize(img,(0,0),fx=scale,fy=scale))
+						cv2.waitKey(0)
+						cv2.destroyAllWindows()
+
+						img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
+						startPoint.draw(img)
+						cv2.circle(img, (startPoint.point.x,startPoint.point.y), 10, (255,0,0), 4)
+						table.draw(img)
+						cv2.imshow("",cv2.resize(img,(0,0),fx=scale,fy=scale))
+						cv2.waitKey(0)
+						cv2.destroyAllWindows()
+						a  = 0
+
+					tables.append(table)
+					img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
+					
+					if i > 0 or j > 0:
+						img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2BGR)
+						startPoint.draw(img)
+						cv2.circle(img, (startPoint.point.x,startPoint.point.y), 10, (255,0,0), 4)
+
+						for e in edges2:
+							e.draw(img)
+						for e in edges1:
+							e.draw(img)
+						showImage(img,"ff")
+
+					try:
+						tablePoints = removeDirections(table,tablePoints)
+					except Exception as e:
+						a = 0
+					sortedDirections = sortInToDirections(tablePoints)
+						
+					stop = True #To break outer loop
+					break;
+
+					#Points with any directions to search are removed by removeDirections
+					#If a point is completly searched, remove it from tablePoints				
+			if directionsIndex == directionsIndexMax:
+					completlySearched = True
+					break
+							
+			directionsIndex = directionsIndex + 1
+
 	return tables
 					
 						
-	
+def printTP(tp):
+	print ""
+	for t in tp:
+		print t.point.x,t.point.y
+	print ""
 
 def removeDirections(table,tablePoints):
 	for tp in tablePoints:
 		if distance(table.p1,tp.point) == 0:
 			tp.removeDirection(2)
 			tp.removeDirection(3)
-			if tp.amount == 0:
+			if sum(tp.s) == 0:
 				tablePoints.remove(tp)
 				#print 'remove'
 		elif distance(table.p2,tp.point) == 0:
 			tp.removeDirection(3)
 			tp.removeDirection(4)
-			if tp.amount == 0:
+			if sum(tp.s) == 0:
 				tablePoints.remove(tp)
 				#print 'remove'
 		elif distance(table.p3,tp.point) == 0:
 			tp.removeDirection(1)
 			tp.removeDirection(4)
-			if tp.amount == 0:
+			if sum(tp.s) == 0:
 				tablePoints.remove(tp)
 				#print 'remove'
 		elif distance(table.p4,tp.point) == 0:
 			tp.removeDirection(1)
 			tp.removeDirection(2)
-			if tp.amount == 0:
+			if sum(tp.s) == 0:
 				tablePoints.remove(tp)
 				#print 'remove'
 	return tablePoints
 
+
+def searchEdge3(edge1,edge2,sortedDirections,direction, directionContraint):
+	wantedDirections = [3,4,1,2]
+	sortedPoints = sortedDirections[wantedDirections[direction - 1] - 1]
+
+	proposal  = Point(edge1.point.x, edge2.point.y)
+
+	for i in range(0,len(sortedPoints)):
+		if distance(proposal,sortedPoints[i].point) < 5:
+				if edge1.distanceToTablePoint(sortedPoints[i],direction,directionContraint) < 10000: # <10000 => contains wanted directions
+					return sortedPoints[i]
+				else:
+					return None
+	return None
+
+	
+
 def searchClosestPoint(tp,sortedDirections,direction,directionContraint):
 	wantedDirections = [3,4,1,2]
-	dir = sortedDirections[wantedDirections[direction-1]-1]
+	dir = sortedDirections[wantedDirections[direction - 1] - 1]
 
 	distances = np.zeros((len(dir)))
 	
@@ -559,7 +673,7 @@ def searchClosestPoint(tp,sortedDirections,direction,directionContraint):
 
 
 	minIndex = np.argmin(distances)
-	closest = sortedDirections[wantedDirections[direction-1]-1][minIndex]
+	closest = sortedDirections[wantedDirections[direction - 1] - 1][minIndex]
 	
 	#Prevent returning first tp when all distances are 1OOOO
 	if distances[minIndex] == 10000:
@@ -567,11 +681,18 @@ def searchClosestPoint(tp,sortedDirections,direction,directionContraint):
 
 	return closest
 
-def searchClosestPointsss(tp,sortedDirections,direction,directionContraint):
-	wantedDirections = [3,4,1,2]
-	dir = sortedDirections[wantedDirections[direction-1]-1]
 
-	distances = []#np.zeros((len(dir)))
+#Searches valid edges using the given horizontal and vertical direction
+#Multiple edges are returned: usually the closest is needed. 
+#Low resolution images and near by text ==> unwanted crossings ==> multiple edges avoid missed detection of a cell
+
+
+#### 1 geval waar het mis gaat omdat alles toevallig uitlijnt (slechte crossing omw lage resolutie) 
+def searchValidEdges(tp,sortedDirections,direction,directionContraint):
+	wantedDirections = [3,4,1,2]
+	dir = sortedDirections[wantedDirections[direction - 1] - 1]
+
+	distances = []
 	
 	for i in range(0,len(dir)):
 		tablep = dir[i]
@@ -604,10 +725,21 @@ def printTables(tables):
 
 #Zie notes 24/1, 25/1
 #Verwijderd punten die sterk afwijken omdat deze mogelijk geen directions heeft
-# 2 Mogelijkheden: 
-# 1. Repair: punten die sterk afwijken bv als deze als enigste waarde afwijkt in een kolom/rij => pas waarden aan
-# 2. Exploit kolom info 
+# 2 Mogelijkheden:
+# 1.  Repair: punten die sterk afwijken bv als deze als enigste waarde afwijkt
+# in een kolom/rij => pas waarden aan
+# 2.  Exploit kolom info
 def removeUnrelevantPoints(tablePoints,border):
+	temp = []
+
+	for tp in tablePoints:
+		if tp.s[0] + tp.s[2] > 0 and tp.s[1] + tp.s[3]:
+			temp.append(tp)
+	return temp
+
+
+
+
 	sortedDirections = sortInToDirections(tablePoints)
 	temp = []
 	for tp in tablePoints:
@@ -622,11 +754,11 @@ def removeUnrelevantPoints(tablePoints,border):
 				a = True
 			else:
 				needToContain = [3,4,1,2] #Needs to have this direction otherwise not relevant for construction
-				if tp.containsDirection(needToContain[b-1]): #needToContain[b-1]
+				if tp.containsDirection(needToContain[b - 1]): #needToContain[b-1]
 					temp.append(tp)
 					a = True
 		if a == False:
-			gg  =0
+			gg = 0
 
 	return temp
 
@@ -637,10 +769,10 @@ def sortInToDirections(tablePoints):
 	
 	for tp in tablePoints:
 		for dir in tp.directions:
-			temp[dir-1].append(tp)
+			temp[dir - 1].append(tp)
 	return temp
 
-def sortPointsTables(tables,keypoints,pob1,pob2,pob3,border):
+def addBorderPointsToSortedPoints(tables,keypoints,pob1,pob2,pob3,border):
 	sorted = []
 
 	for t in tables:
@@ -676,58 +808,85 @@ def sortPointsTables(tables,keypoints,pob1,pob2,pob3,border):
 
 	return sorted
 
-def findTables(pointsAbovePob2,index,tables,image,pob3):
-	if index == len(pointsAbovePob2)-1:
+def findSubTables(pointsAbovePob2,index,tables,image,pob3):
+	if index == len(pointsAbovePob2) - 1:
 		return tables
 
-	try:
-		while True:
-			matchList = findMatches(pointsAbovePob2[index],pointsAbovePob2[index + 1],image)
+	while True:
+		matchList = findMatches(pointsAbovePob2[index],pointsAbovePob2[index + 1],image)
 
-			pressed = True #True if 2 different tables are adjacent
-			if matchList.size == 2:
-				pressed = False
-				index = index + 1
+		adjacent = True #True if 2 different tables are adjacent
+		if matchList.size == 2: #only 1 match
+			adjacent = False
+			index = index + 1
 
-			lastColomnIndex = searchEnd(index,pointsAbovePob2,pob3,image)
-			lastColomn = pointsAbovePob2[lastColomnIndex]
+		lastColomnIndex = searchEnd(index,pointsAbovePob2,pob3,image)
 
-			corner2 = findMissingPoint(lastColomn[-1,:],pointsAbovePob2[index],image)
+		if lastColomnIndex == -1 or lastColomnIndex == index:
+			return tables
 
-			tableTemp = Rectangle.Rectangle(pointsAbovePob2[index][0,:],corner2,lastColomn[-1,:],lastColomn[0,:])
-			tables.append(tableTemp)
+		lastColomn = pointsAbovePob2[lastColomnIndex]
+		c1 = pointsAbovePob2[index][0]
 
-			#image = tableTemp.draw(np.copy(image))
-			#showImage(image,'',0.3)
+		newSubTable = constructSubtable(c1,pointsAbovePob2[index],lastColomn,image)
+		tables.append(newSubTable)
 
-			index = lastColomnIndex
-			if index == len(pointsAbovePob2)-1:
-				break
-	except:
-		doNoting = True
+		#corner2 = findMissingPoint(lastColomn[-1,:],pointsAbovePob2[index],image)
+
+		#tableTemp =
+		#Rectangle.Rectangle(pointsAbovePob2[index][0,:],corner2,lastColomn[-1,:],lastColomn[0,:])
+
+
+		image = newSubTable.draw(np.copy(image))
+		#showImage(image,'',0.3)
+
+		index = lastColomnIndex
+		if index == len(pointsAbovePob2) - 1:
+			break
+	#except:
+		#doNoting = True
 	return tables
 
-def findMissingPoint(corner3,colomn,image):
-	if colomn.size == 2:
-		if lineDetector(corner3,colomn,image):
-			return colomn
-	else:
-		for i in range(0,colomn.shape[0]):
-			if lineDetector(corner3,colomn[i,:],image):
-				return colomn[i,:]
-	return None
+def constructSubtable(c1,colomn1, colomn2,image):
+	colomn1 = checkLineConnectivity(colomn1,image)
+	colomn2 = checkLineConnectivity(colomn2,image)
+	c2,c3 = findTopMatchColomn(colomn1, colomn2, image)
+	c4 = colomn2[0,:]
+	return Rectangle.Rectangle(c1,c2,c3,c4)
 
+def checkLineConnectivity(points,image):
+	a  = 0
+	for i in range(points.shape[0]-1):
+		p1 = points[i,:]
+		p2 = points[i+1,:]
+		if not lineDetector(p1,p2,image):
+			return points[0:i+1]
+	return points
+	return pointsed
+
+def findTopMatchColomn(colomn1, colomn2,image):
+	#List are ordered to optimize search
+	#Points of subtable are both in top of colomn1 and 2
+	for i in range(colomn1.shape[0] - 1,-1,-1):
+		for j in range(colomn2.shape[0] - 1,-1,-1):
+			if abs(colomn1[i,1] - colomn2[j,1]) <= 5:
+				if lineDetector(colomn1[i,:],colomn2[j,:],image):
+					p1 = colomn1[i,:]
+					p2 = colomn2[j,:]
+					return p1,p2
 
 def searchEnd(start,pointsAbovePob2,pob3,image):
 	stop = False
 	while not stop:
 		if findMatches(pointsAbovePob2[start],pointsAbovePob2[start + 1],image).size > 2:
-			if start == len(pointsAbovePob2) -2:
+			if abs(pointsAbovePob2[start][0,1] - pointsAbovePob2[start + 1][0,1]) > 5:
+				#Large difference in length ==> new colomn
+				return start
+			if start == len(pointsAbovePob2) - 2:
 				return start + 1
-			else:
-				start = start + 1
+			start = start + 1
 		else:
-			return start
+			return start ##### start
 		
 	
 	return -1
@@ -764,11 +923,11 @@ def sortPointsAbovePOB2(pob2,points,p2,pob1,yMin):
 	for i in range(0,pob2.shape[0]):
 		temp = []
 		for p in points:
-			if abs(p.x - pob2[i,0]) <= 2:
+			if abs(p.x - pob2[i,0]) <= 4: ######
 				if(p.y >= yMin):
 					temp.append(p)
 
-		temp = pointToArrayList(temp)
+		temp = pointsToArrayList(temp)
 		temp = np.vstack((temp,pob2[i,:]))
 		temp = np.sort(temp,axis = 0)[::-1]
 		above.append(temp)
@@ -779,7 +938,7 @@ def sortPointsAbovePOB2(pob2,points,p2,pob1,yMin):
 	above.append(temp)
 
 	#
-	for i in range(len(above)-1,0,-1):
+	for i in range(len(above) - 1,0,-1):
 		if above[i].size <= 4:
 			above.pop(i)
 		else:
@@ -789,80 +948,9 @@ def sortPointsAbovePOB2(pob2,points,p2,pob1,yMin):
 
 	return above
 
-def findCorners(c1,c2,c3,c4,image):
-	#c1 and c2 are always specified as np array
-	#c3 and c4 are np arrays of points
-
-	
-	corner3 = []
-	if c3.size == 2:
-		if lineDetector(c2,c3,image):
-			corner3.append(c3)
-	else:
-		for i in range(0,c3.shape[0]):
-			if lineDetector(c2,c3[i,:],image):
-				corner3.append(c3[i,:])
-	
-	if len(corner3) == 0:
-		print("Corner 3 not found")
-		exit()
-
-	img = np.copy(image)
-	
-	
-	
-
-	#Compute canidates c4
-	corner4 = []
-	if c4.size == 2:
-		if lineDetector(c1,c4,image):
-			corner4.append(c4)
-	else:
-		for i in range(0,c4.shape[0]):
-			if lineDetector(c1,c4[i,:],image):
-				corner4.append(c4[i,:])
-	'''
-	for a in corner3:
-		cv2.circle(img, (int(a[0]),int(a[1])), 5, (255,0,0), 1)
-	
-	for a in corner4:
-		cv2.circle(img, (int(a[0]),int(a[1])), 5, (255,0,0), 1)
-	showImage(img,'',1)
-	'''
-
-	if len(corner4) == 0:
-		print("Corner 4 not found")
-		exit()
-
-	found = False
-	borders = []
-	for cor3 in corner3:
-		for cor4 in corner4:
-			if lineDetector(cor3,cor4,image):
-				c3 = cor3
-				c4 = cor4
-				b = Rectangle.Rectangle((c1),(c2),(c3),(c4))
-				borders.append(b)
-				found = True
-	'''
-	for b in borders:
-		img = np.copy(image)
-		b.draw(img)
-		showImage(img,'',1)
-	'''
-
-
-	if found:
-		b = Rectangle.largerstBorder(borders)
-		
-		return b,c1,c2,c3,c4
-		
-	else:
-		print("Corner3 and 4 don't match")
-		exit()
 
 #Gray images!!
-def lineDetector(p1,p2,image):
+def lineDetector1(p1,p2,image):
 	if isinstance(p1,Point):
 		p1 = p1.pointToArray()
 		p2 = p2.pointToArray()
@@ -906,21 +994,7 @@ def lineDetector(p1,p2,image):
    
 	return False
 
-def pointsInInterval(minX,maxX,ySearch,points):
-	global tollerance
-	interval = []
-	for p in points:
-		x, y = p.pointUnpack()
 
-		contains = False
-		if (ySearch - tollerance) <= y and y <= (ySearch + tollerance):
-			if (minX - tollerance) <= x and x <= (maxX + tollerance):
-				interval.append(p)
-	
-	if len(interval) == 1:
-		return interval[0].pointToArray()
-
-	return pointToArrayList(interval)
 			
 def pointsInInterval2(minY,maxY,xSearch,points):
 	global tollerance
@@ -939,18 +1013,15 @@ def pointsInInterval2(minY,maxY,xSearch,points):
 		else:
 			remaining.append(p)
 
-	temp = pointToArrayList(interval)
+	temp = pointsToArrayList(interval)
 	temp = np.sort(temp,axis = 0)
 	return temp, remaining
 
-def showImage(image,title,scale):
-	fx = 1000/float(image.shape[0])
-
-	cv2.imshow(title,cv2.resize(image,(0,0),fx=fx,fy=fx))
-	cv2.waitKey(0)
-	cv2.destroyAllWindows()			
+def showImage(image,title):
+	if showImages:
+		cv2.imshow(title,cv2.resize(image,(0,0),fx=scale,fy=scale))
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()			
 
 			
 
-
-	  

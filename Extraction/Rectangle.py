@@ -7,22 +7,10 @@ import numpy as np
 from TablePoint import *
 
 class Rectangle:
-	# 4 punten genomen ipv 2 omdat de rechthoeken een beetje kunnen afwijken
-	# Bij init: punten formatten zodat p1 altijd het punt links boven,...
+	#4 points to allow for small deviations
+	#Sort point: p1 is always upper left corner
 	def __init__(self, p1,p2,p3,p4):
-		'''
-		if not isinstance(p1,Point):
-			p1 = arrayToPoint(p1)
-
-		if not isinstance(p2,Point):
-			p2 = arrayToPoint(p2)
-
-		if not isinstance(p3,Point):
-			p3 = arrayToPoint(p3)
-
-		if not isinstance(p4,Point):
-			p4 = arrayToPoint(p4)
-		'''
+		
 		if type(p1) is np.ndarray :
 			p1 = arrayToPoint(p1)
 		elif isinstance(p1,TablePoint):
@@ -47,7 +35,7 @@ class Rectangle:
 		points = [p1,p2,p3,p4]
 		dis = np.zeros(4)
 
-		#punt dichste bij 0,0 is het punt links boven
+		#Point closest to zero is upper left corner
 		for i in range(0,4):
 			dis[i] = distance(points[i],Point(0,0))
 
@@ -63,36 +51,6 @@ class Rectangle:
 
 		self.p3 = points[0]
 
-		
-	'''
-	def containsPoint(self,point):
-		if isinstance(point,Point):
-			x = point.x
-			y = point.y
-		else:
-			x = point[0]
-			y = point[1]
-
-		#Quick check if points lies between border
-		if self.p1.x - 2 <= x and x <= self.p4.x + 2:
-			if self.p1.y - 2 <= y and self.p2.y + 2:
-				return True
-	
-		
-		#Points near 
-		if distancePointToLine(self.p1,self.p2,x,y) <= 2:
-			return True
-		if distancePointToLine(self.p2,self.p3,x,y) <= 2:
-			return True
-		if distancePointToLine(self.p3,self.p4,x,y) <= 2:
-			return True
-		if distancePointToLine(self.p4,self.p1,x,y) <= 2:
-			return True
-		return False
-	'''
-
-
-		############
 	def pointBelongsToBorder(self,point):
 		if distance(self.p1,point) <= 2:
 			return True
@@ -160,6 +118,14 @@ class Rectangle:
 				return True
 		return False
 
+	def validBorder(self,image):
+		if not lineDetector(self.p1,self.p2,image):	return False
+		if not lineDetector(self.p2,self.p3,image):	return False
+		if not lineDetector(self.p3,self.p4,image):	return False
+		if not lineDetector(self.p1,self.p4,image):	return False
+	
+		return True
+
 	#For table construction
 	def contains2(self,r):
 		tolerance = 2
@@ -204,14 +170,23 @@ class Rectangle:
 	def area(self):
 		return (self.p3.x - self.p2.x) * (self.p2.y - self.p1.y)
 
-def largerstBorder(borders):
+def largestRectangle(rectangles):
 	largest = None
 	size = 0
-	for b in borders:
-		if b.area > size:
-			largest = b
-			size = b.area
+	for r in rectangles:
+		if r.area > size:
+			largest = r
+			size = r.area
 	return largest
+
+def smallestRectangle(rectangles):
+	smallest= None
+	size = 9999999999
+	for r in rectangles:
+		if r.area < size:
+			smallest = r
+			size = r.area
+	return smallest
 
 def combine(r1,r2):
 	#Find common edge
@@ -223,3 +198,5 @@ def combine(r1,r2):
 		return Rectangle(r2.p3,r2.p4,r1.p1,r1.p2)
 	if distance(r1.p1,r2.p2) <= 2 and distance(r1.p4,r2.p3) <= 2:
 		return Rectangle(r2.p1,r2.p4,r1.p2,r1.p3)
+
+

@@ -63,11 +63,11 @@ def pointOccursInList(p,list, allowedDeviation):
 
 
 def drawLine(point1,point2,image):
-	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),2)
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),(255,255,0),10)
 	return image
 
 def drawLineColor(point1,point2,image,color):
-	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),color,3)
+	image = cv2.line(image,(int(point1.x),int(point1.y)),(int(point2.x),int(point2.y)),color,10)
 	return image
 
 #Determine minimum - maximum x - y values of array of points
@@ -135,7 +135,7 @@ def lineDetector(p1,p2,image):
 		p2 = p2.pointToArray()
 
 	if abs(p1[0] - p2[0]) >= 8 and abs(p1[1] - p2[1]) >= 8:
-		return False #vertical or horizontal
+		return False 
 
 	array = np.vstack((p1,p2))
 	array = array.astype(int)

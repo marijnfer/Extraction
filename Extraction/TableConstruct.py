@@ -10,7 +10,7 @@ import TableTemplate
 import Table
 import time
 
-saveImages = True
+saveImages = False
 showImages = False
 scale = 0.7
 
@@ -21,8 +21,6 @@ class TableConstruct:
 		self
 
 def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSavePath,orginalImagePath, cellOCRPath):
-
-
 	start  = time.clock()
 
 	keypoints = keypoints[:]
@@ -58,7 +56,7 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSaveP
 	table1 = findTitleBlock(border.p3.pointToArray(),c2,possibleC3, possibleC4,image)
 	tables.append(table1)
 
-	print "Title block detection			", "%.3gs" % (time.clock() - start)
+	dTitle = time.clock() - start
 	start = time.clock()
 
 	if pob1.size <= 2:
@@ -80,6 +78,9 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSaveP
 
 	tables = findSubTables(pointsAbovePob2,index,tables,image,pob3) 
 
+	dSub = time.clock() - start
+	start = time.clock()
+
 	img = cv2.cvtColor(np.copy(image), cv2.COLOR_GRAY2RGB)
 	for t in tables:
 			t.draw(img)
@@ -88,8 +89,6 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSaveP
 		cv2.imwrite(loc,img)    
 	showImage(img,"Detected tables")
 
-	print "Detect substables			", "%.3gs" % (time.clock() - start)
-	start = time.clock()
 
 	sortedPoints = addBorderPointsToSortedPoints(tables,keypoints,pob1,pob2,pob3,border)
 		
@@ -159,14 +158,15 @@ def constructTable(pob1,pob2,pob3,pob4,keypoints,border,image,savePath,cellSaveP
 		loc = savePath + "14 Detected tabels and cells.png"
 		cv2.imwrite(loc,img0)
 
-	print "Detect cells				", "%.3gs" % (time.clock() - start)
+	dCells = time.clock() - start
 
+	aCells = 0
+	for ft in formattedTables:
+		aCells = aCells + len(ft)
 
-
-	
 	#tableHierachy(tables[i],formattedTables[i],image)
 
-	return formattedTables
+	return formattedTables, dTitle, dSub, dCells, aCells
 
 
 

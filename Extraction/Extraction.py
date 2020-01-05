@@ -16,11 +16,12 @@ from Point import *
 import shutil
 import time
 import TableConstruct
+import xlsxwriter
 
 import matplotlib.pyplot as plt #importing matplotlib
 saveImages = True
-showImages = False
-scale = 1
+showImages = True
+scale = 0.5
 
 basePath = 'C:\\Users\\MarijnFerrari\\Desktop\\Thesis\\'
 savePath = basePath + 'Drawings2\\Results\\'
@@ -182,16 +183,16 @@ def getCornerPoints(image,keypoints,savePath):
 	img = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB) 
 
 	for point in corners[0]:
-		cv2.circle(img, (point.x,point.y), 8, (255,0,0), 3)
+		cv2.circle(img, (point.x,point.y), 10, (255,0,0), 3)
 
 	for point in corners[1]:
-		cv2.circle(img, (point.x,point.y), 8, (0,255,0), 3)
+		cv2.circle(img, (point.x,point.y), 10, (0,255,0), 3)
 
 	for point in corners[2]:
-		cv2.circle(img, (point.x,point.y), 8, (0,0,255), 3)
+		cv2.circle(img, (point.x,point.y), 10, (0,0,255), 3)
 
 	for point in corners[3]:
-		cv2.circle(img, (point.x,point.y), 8, (255,255,0), 3)
+		cv2.circle(img, (point.x,point.y), 10, (255,255,0), 3)
 
 
 	X = img.shape[1]
@@ -199,11 +200,11 @@ def getCornerPoints(image,keypoints,savePath):
 
 	sizeX = X / 10
 	sizeY = Y / 10
-
-	cv2.rectangle(img,(1,1),(sizeX,sizeY),(255,0,0),3)
-	cv2.rectangle(img,(X - sizeX - 1,1),(X - 1,sizeY - 1),(0,255,0),3)
-	cv2.rectangle(img,(1,Y - 1),(sizeX,Y - sizeY),(0,0,255),3)
-	cv2.rectangle(img,(X - 1,Y - 1),(X - 1 - sizeX,Y - 1 - sizeY),(255,255,0),3)
+	a = 5
+	cv2.rectangle(img,(a,a),(sizeX,sizeY),(255,0,0),10)
+	cv2.rectangle(img,(X - sizeX - a,a),(X - a,sizeY - a),(0,255,0),10)
+	cv2.rectangle(img,(a,Y - a),(sizeX,Y - sizeY),(0,0,255),10)
+	cv2.rectangle(img,(X - a,Y - a),(X - a - sizeX,Y - a - sizeY),(255,255,0),10)
 
 	if saveImages:
 		loc = savePath + '7 corners.png'
@@ -249,6 +250,30 @@ def determineBorder(image,cornerpoints,savePath):
 	imgBorders = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
 
 	border.drawColor(imgBorder,list(np.random.choice(range(256), size=3)))
+	i = 0
+	for r in possibleBorders:
+		temp = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+		r.draw(temp)
+		showImage(temp,"")
+		i = i + 1
+	
+
+	temp1 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+	temp2 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+	temp3 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+	temp4 = cv2.cvtColor(np.copy(image),cv2.COLOR_GRAY2RGB)
+
+	possibleBorders[0].draw(temp1)
+	possibleBorders[1].draw(temp2)
+	possibleBorders[2].draw(temp3)
+	possibleBorders[3].draw(temp4)
+
+	temp = np.vstack((np.hstack((temp1,temp2)),np.hstack((temp3,temp4))))
+
+
+
+	loc = savePath + 'totaal.png'
+	cv2.imwrite(loc,temp)
 
 	for r in possibleBorders:
 		r.drawColor(imgBorders,list(np.random.choice(range(256), size=3)))
@@ -333,41 +358,68 @@ def deleteBorderFromKeypoints(border,keypoints, pob1,pob2,pob3,pob4,image,savePa
 def application(path,savePath, cellSavePath,cellOCRPath):
 	start = time.clock()
 
+
 	try:
 		for root, dirs, files in os.walk(savePath):
 			for f in files:
 				os.unlink(os.path.join(root, f))
 	except:
 		print savePath + "	file error"
+
+	
 		
 	img_initial = prepare(path,savePath)
 	
+	dPrep = time.clock()- start
+	start = time.clock()
+
 	img_crosspoints = crosspointDetection(img_initial,savePath)
 	
 	keypoints = blobDetection(img_crosspoints,savePath)
+
+	dCross = time.clock() - start
+	start = time.clock()
 
 	cornerpoints = getCornerPoints(img_initial,keypoints,savePath)
 
 	border = determineBorder(img_initial,cornerpoints,savePath)
 
+	
+
 	pob1,pob2,pob3,pob4 = keypointsOnBorder(keypoints, border,2,img_initial,savePath)
 
 	keypoints = deleteBorderFromKeypoints(border,keypoints,pob1,pob2,pob3,pob4,img_initial,savePath)
 
+	dBorder = time.clock() - start
+
 	stop1 = time.clock()
 	print "Preparation and border detection	%.3gs" % (stop1- start)
 
-	TableConstruct.constructTable(pob1,pob2,pob3,pob4,keypoints,border,img_initial,savePath,cellSavePath,path,cellOCRPath)
+	_,  dTitle, dSub, dCells, aCells = TableConstruct.constructTable(pob1,pob2,pob3,pob4,keypoints,border,img_initial,savePath,cellSavePath,path,cellOCRPath)
 	stop2 = time.clock()
 
 
 	print "Cell detection				%.3gs" % (stop2- stop1)
+	durPrep.append(dPrep)
+	durCross.append(dCross)
+	durBorder.append(dBorder)
+	durTitle.append(dTitle)
+	durSub.append(dSub)
+	durCell.append(dCells)
+	cells.append(aCells)
 
 
 
+durPrep = []
+durCross = []
+durBorder = []
+durTitle = []
+durSub = []
+durCell =[]
+cells = []
 	
 startTotal = time.clock()
-for i in range(0,180):
+for i in range(15,16):
 	print "Drawing {}					". format(i)
 	start = time.clock()
 	imagePath = mainPath + '{}.png'.format(i)
@@ -379,9 +431,22 @@ for i in range(0,180):
 	print "Total proccesing time image {}		%.3gs".format(i) % ( time.clock()-start)
 	print 
 
+
+
 print
 print
 print "Proccesing time				%.3gs" % ( time.clock()-startTotal)
-
+workbook = xlsxwriter.Workbook('C:\\Users\\MarijnFerrari\\Desktop\\Thesis\\Drawings2\\results.xlsx')
+worksheet = workbook.add_worksheet()
+for i in range(5,16):
+	worksheet.write(i,0,durPrep[i])
+	worksheet.write(i,1,durCross[i])
+	worksheet.write(i,2,durBorder[i])
+	worksheet.write(i,3,durTitle[i])
+	worksheet.write(i,4,durSub[i])
+	worksheet.write(i,5,durCell[i])
+	worksheet.write(i,6,cells[i])
+workbook.close()
+a = 0
 
 
